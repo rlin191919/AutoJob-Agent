@@ -5,6 +5,9 @@
 
 # 将你的项目下载到本地（把网址换成你自己的仓库地址）
 git clone https://github.com/你的用户名/AutoJob-Agent.git
+# 当你用浏览器打开你的 GitHub 仓库主页时，浏览器最上方的地址栏就是你的仓库地址。
+它的标准格式是：
+https://github.com/你的用户名/你的仓库名
 
 # 进入项目文件夹
 cd AutoJob-Agent
