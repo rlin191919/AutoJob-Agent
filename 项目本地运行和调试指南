@@ -1,0 +1,35 @@
+标准的开发者工作流，建议配合 VS Code 或 Cursor 编辑器使用。
+
+一：把 GitHub 的代码克隆到本地
+打开你电脑的终端（Terminal 或 Command Prompt），运行以下命令：
+
+# 将你的项目下载到本地（把网址换成你自己的仓库地址）
+git clone https://github.com/你的用户名/AutoJob-Agent.git
+
+# 进入项目文件夹
+cd AutoJob-Agent
+
+# 二、友情提示，拷贝本项目代码至您的本地文件之前，您需要创建虚拟环境（专业避坑指南）
+为了防止这个项目的依赖库和你电脑里其他 Python 项目起冲突，务必养成创建虚拟环境的习惯：
+# 创建一个名为 venv 的虚拟环境
+python -m venv venv
+
+# 激活虚拟环境
+# 如果是 Windows:
+venv\Scripts\activate
+# 如果是 Mac / Linux:
+source venv/bin/activate
+激活后，你会发现终端命令行前面多了一个 (venv)，说明你现在处于隔离的安全环境中。
+
+# 三、：安装依赖并运行
+把上一轮对话中提到的代码写进 app.py，然后运行：
+
+pip install streamlit python-docx pdfplumber
+streamlit run app.py
+
+四：如何在本地调试（Debugging）
+当你在 Vibe Coding 遇到 Bug，或者上传简历网页报错时，有三种调试方法：
+
+查看终端报错（Terminal Logs）：当网页出错时，不要慌，去看你运行 streamlit run 的那个黑窗口（终端），里面会打印出详细的错误行数和原因，把这段错误直接复制给 AI，它能秒级帮你修复。
+
+利用 st.write() 打印流：Streamlit 调试非常直观。你想知道简历文本有没有正确提取，可以直接在代码里加一行 st.write(resume_text)，它会直接把变量渲染在网页上，方便你肉眼检查。
