@@ -28,7 +28,7 @@ Phase 1: 简历与 JD 文本解析模块开发 (进行中)
 Phase 2: 基于 STAR 法则的简历深度优化 Prompt 调试
 Phase 3: Streamlit 交互前端页面搭建
 Phase 4: 浏览器自动化投递脚本集成（Playwright）
-- [ ] **Phase 5**: 商业化探索与多账号管理
+Phase 5: 商业化探索与多账号管理
 
 ## 开发者共享指南
 
