@@ -3,7 +3,6 @@ import docx
 import pdfplumber
 import io
 import time
-import re
 
 # ==========================================
 # 1. 页面配置
@@ -322,6 +321,17 @@ st.markdown("""
         border-color: rgba(255,255,255,0.3) !important;
     }
 
+    /* 强制下拉列表向下展开 - 覆盖 baseweb 默认行为 */
+    .stSelectbox [data-baseweb="select"] [data-baseweb="popover"],
+    .stSelectbox [data-baseweb="select"] [role="listbox"],
+    .stSelectbox [data-baseweb="select"] > div:nth-child(2),
+    .stSelectbox [data-baseweb="menu"] {
+        top: 100% !important;
+        bottom: auto !important;
+        margin-top: 4px !important;
+        margin-bottom: 0 !important;
+    }
+
     /* 文件上传器 */
     .stFileUploader > div {
         background: rgba(0, 0, 0, 0.1) !important;
@@ -427,6 +437,17 @@ st.markdown("""
         font-size: 0.9rem;
         margin-bottom: 1rem;
     }
+
+    /* 卡片标题样式 - 确保在毛玻璃内 */
+    .card-header {
+        color: rgba(255,255,255,0.95);
+        font-size: 1.15rem;
+        font-weight: 700;
+        margin-bottom: 1.2rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -477,13 +498,11 @@ def extract_cities_from_resume(text):
     if not text:
         return []
 
-    # 常见城市关键词匹配
     found_cities = []
     for city in CHINA_CITIES:
         if city in text:
             found_cities.append(city)
 
-    # 去重并限制数量
     return list(dict.fromkeys(found_cities))[:3]
 
 # ==========================================
@@ -533,9 +552,9 @@ if st.session_state.app_stage == "input":
     col1, col2 = st.columns(2, gap="large")
 
     with col1:
-        # 简历上传 - 毛玻璃包裹
+        # === 简历上传 - 标题在毛玻璃内 ===
         st.markdown('<div class="glass-panel">', unsafe_allow_html=True)
-        st.markdown("### 📄 原始简历上传")
+        st.markdown('<div class="card-header">📄 原始简历上传</div>', unsafe_allow_html=True)
 
         uploaded_resume = st.file_uploader(
             "支持 PDF 或 DOCX", 
@@ -543,7 +562,6 @@ if st.session_state.app_stage == "input":
             label_visibility="collapsed"
         )
 
-        # 上传后自动解析城市
         if uploaded_resume:
             resume_text_temp = extract_text(uploaded_resume)
             if resume_text_temp:
@@ -556,9 +574,9 @@ if st.session_state.app_stage == "input":
 
         st.markdown('</div>', unsafe_allow_html=True)
 
-        # 智能投递意向 - 毛玻璃包裹
+        # === 智能投递意向 - 标题在毛玻璃内 ===
         st.markdown('<div class="glass-panel">', unsafe_allow_html=True)
-        st.markdown("### 🤖 智能投递意向")
+        st.markdown('<div class="card-header">🤖 智能投递意向</div>', unsafe_allow_html=True)
 
         target_company = st.selectbox(
             "意向公司类型", 
@@ -571,9 +589,9 @@ if st.session_state.app_stage == "input":
         st.markdown('</div>', unsafe_allow_html=True)
 
     with col2:
-        # 目标岗位 JD - 毛玻璃包裹
+        # === 目标岗位 JD - 标题在毛玻璃内 ===
         st.markdown('<div class="glass-panel">', unsafe_allow_html=True)
-        st.markdown("### 🎯 目标岗位 JD")
+        st.markdown('<div class="card-header">🎯 目标岗位 JD</div>', unsafe_allow_html=True)
 
         jd_input_method = st.radio(
             "提供方式", 
@@ -584,7 +602,6 @@ if st.session_state.app_stage == "input":
 
         jd_text_raw = ""
         if jd_input_method == "手动粘贴文本":
-            # 黑体提示文字
             st.markdown('<div class="hint-text">请把招聘软件上的职位描述(JD)粘贴在这里</div>', unsafe_allow_html=True)
             jd_text_raw = st.text_area(
                 "粘贴 JD", 
@@ -607,16 +624,14 @@ if st.session_state.app_stage == "input":
 
         st.markdown('</div>', unsafe_allow_html=True)
 
-        # 投递意向地区 - 毛玻璃包裹（新增）
+        # === 投递意向地区 - 标题在毛玻璃内 ===
         st.markdown('<div class="glass-panel">', unsafe_allow_html=True)
-        st.markdown("### 📍 投递意向地区")
+        st.markdown('<div class="card-header">📍 投递意向地区</div>', unsafe_allow_html=True)
 
-        # 检测简历中的城市
         if st.session_state.detected_cities:
             cities_str = "、".join(st.session_state.detected_cities)
             st.markdown(f'<div class="city-detected">🎯 已从简历检测到意向城市：{cities_str}</div>', unsafe_allow_html=True)
 
-            # 使用检测到的城市
             selected_from_resume = st.selectbox(
                 "确认意向城市",
                 st.session_state.detected_cities + ["其他（手动输入）"],
@@ -632,7 +647,6 @@ if st.session_state.app_stage == "input":
         else:
             st.markdown('<div class="city-not-detected">○ 未从简历检测到意向城市，请手动选择</div>', unsafe_allow_html=True)
 
-            # 国内/海外选择
             city_scope = st.radio(
                 "地区范围",
                 ["国内", "海外"],
