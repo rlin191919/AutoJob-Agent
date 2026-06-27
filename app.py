@@ -6,7 +6,7 @@ import time
 import re
 
 # ==========================================
-# 1. 页面配置
+# 1. 页面配置 (必须是 Streamlit 的第一个命令)
 # ==========================================
 st.set_page_config(
     page_title="AutoJob-Agent | 智能海投系统",
@@ -16,7 +16,7 @@ st.set_page_config(
 )
 
 # ==========================================
-# 2. 高级 CSS - 柔和蓝紫渐变 + iOS 毛玻璃
+# 2. 高级 CSS - 柔和蓝紫渐变背景 + iOS 毛玻璃
 # ==========================================
 st.markdown("""
 <style>
@@ -24,7 +24,7 @@ st.markdown("""
 
     * { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
 
-    /* 全局背景 - 柔和蓝紫渐变 */
+    /* 全局网页背景 - 柔和蓝紫渐变流动 */
     .stApp {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #6dd5ed 75%, #667eea 100%) !important;
         background-size: 400% 400% !important;
@@ -37,13 +37,13 @@ st.markdown("""
         100% { background-position: 0% 50%; }
     }
 
-    /* 主容器 */
+    /* 主内容外边距与最大宽度限制 */
     .block-container {
         padding: 2rem 3rem !important;
         max-width: 1200px !important;
     }
 
-    /* 标题区 - 移入毛玻璃专属样式 */
+    /* 标题区专用毛玻璃卡片样式 */
     .title-glass-card {
         background: rgba(255, 255, 255, 0.12) !important;
         backdrop-filter: blur(24px) saturate(180%) !important;
@@ -71,7 +71,7 @@ st.markdown("""
         margin: 0;
     }
 
-    /* iOS 毛玻璃卡片 */
+    /* 主交互区 iOS 毛玻璃卡片 */
     .glass-panel {
         background: rgba(255, 255, 255, 0.15) !important;
         backdrop-filter: blur(24px) saturate(180%) !important;
@@ -95,7 +95,7 @@ st.markdown("""
         border-color: rgba(255, 255, 255, 0.4);
     }
 
-    /* 卡片内标题 - 白色 */
+    /* 卡片内小标题样式 */
     .glass-panel h3 {
         color: rgba(255,255,255,0.95) !important;
         font-weight: 700 !important;
@@ -104,7 +104,7 @@ st.markdown("""
         margin-bottom: 1.2rem !important;
     }
 
-    /* 🚨 修复下拉菜单错位问题：恢复原生相对定位，并优化阴影与圆角 🚨 */
+    /* 🚨 完美解决下拉框定位与高度：强制原位向下，且限高带滚动条 🚨 */
     [data-baseweb="popover"] {
         left: auto !important;
         top: auto !important;
@@ -115,6 +115,8 @@ st.markdown("""
         background-color: rgba(255, 255, 255, 0.95) !important;
         backdrop-filter: blur(10px) !important;
         border-radius: 12px !important;
+        max-height: 240px !important; /* 限制最大高度，防止空间不足导致向上弹窗 */
+        overflow-y: auto !important;   /* 超出时内部自动生成滚动条 */
     }
     [data-baseweb="menu"] li {
         color: #1e293b !important;
@@ -124,7 +126,7 @@ st.markdown("""
         background-color: #f1f5f9 !important;
     }
 
-    /* 步骤指示器 */
+    /* 极简流式步骤指示器 */
     .step-track {
         display: flex;
         align-items: center;
@@ -168,7 +170,7 @@ st.markdown("""
         color: #667eea;
     }
 
-    /* 状态标签 */
+    /* 状态指示胶囊 */
     .status-chip {
         display: inline-flex;
         align-items: center;
@@ -178,7 +180,6 @@ st.markdown("""
         font-size: 0.8rem;
         font-weight: 600;
         backdrop-filter: blur(12px);
-        transition: all 0.3s ease;
     }
     .chip-ready {
         background: rgba(16, 185, 129, 0.25);
@@ -191,15 +192,13 @@ st.markdown("""
         border: 1px solid rgba(255,255,255,0.15);
     }
 
-    /* 主按钮 */
+    /* 高级发光主操作按钮 */
     .stButton > button[kind="primary"] {
         background: rgba(255, 255, 255, 0.25) !important;
         backdrop-filter: blur(16px) !important;
         border: 1px solid rgba(255, 255, 255, 0.4) !important;
         color: rgba(255,255,255,0.95) !important;
-        box-shadow: 
-            0 4px 24px rgba(0,0,0,0.1),
-            inset 0 1px 0 rgba(255,255,255,0.3) !important;
+        box-shadow: 0 4px 24px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.3) !important;
         border-radius: 16px !important;
         font-weight: 600 !important;
         letter-spacing: 0.02em;
@@ -209,12 +208,10 @@ st.markdown("""
     .stButton > button[kind="primary"]:hover {
         background: rgba(255, 255, 255, 0.35) !important;
         transform: translateY(-3px);
-        box-shadow: 
-            0 12px 40px rgba(0,0,0,0.2),
-            inset 0 1px 0 rgba(255,255,255,0.4) !important;
+        box-shadow: 0 12px 40px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.4) !important;
     }
 
-    /* 结果页并列大标题卡片 */
+    /* 结果页大标题卡片样式 */
     .result-header-glass {
         background: rgba(255, 255, 255, 0.15) !important;
         backdrop-filter: blur(24px) saturate(180%) !important;
@@ -233,7 +230,7 @@ st.markdown("""
         font-size: 1.35rem !important;
     }
 
-    /* 结果内容卡片 */
+    /* 结果内容对比卡片 */
     .result-glass {
         background: rgba(255, 255, 255, 0.12) !important;
         backdrop-filter: blur(20px) saturate(150%) !important;
@@ -248,7 +245,6 @@ st.markdown("""
         background: rgba(255, 255, 255, 0.18) !important;
         box-shadow: 0 8px 24px rgba(0,0,0,0.12);
     }
-
     .result-title {
         font-size: 1.15rem;
         font-weight: 700;
@@ -264,7 +260,7 @@ st.markdown("""
         margin-bottom: 1rem;
     }
 
-    /* 成功提示 */
+    /* 成功提示毛玻璃 */
     .success-glass {
         background: rgba(16, 185, 129, 0.2) !important;
         backdrop-filter: blur(16px) !important;
@@ -276,7 +272,7 @@ st.markdown("""
         margin-bottom: 1.5rem;
     }
 
-    /* 输入提示框文字 */
+    /* 文本输入框黑体增强 */
     .hint-text {
         color: rgba(255,255,255,0.9) !important;
         font-weight: 600 !important;
@@ -284,7 +280,7 @@ st.markdown("""
         margin-bottom: 0.6rem !important;
     }
 
-    /* 城市标签 */
+    /* 地区感知卡片配色 */
     .city-detected {
         background: rgba(16, 185, 129, 0.2) !important;
         backdrop-filter: blur(8px) !important;
@@ -306,13 +302,15 @@ st.markdown("""
         margin-bottom: 1.2rem;
     }
 
-    /* 文本区域与底层配置保持稳定 */
+    /* 数据容器内部文本框底层渲染 */
     .stTextArea textarea {
         background: rgba(0, 0, 0, 0.15) !important;
         border: 1px solid rgba(255,255,255,0.15) !important;
         border-radius: 12px !important;
         color: rgba(255,255,255,0.85) !important;
     }
+    
+    /* 隐藏 Streamlit 默认的多余组件 */
     .footer-hint { text-align: center; color: rgba(255,255,255,0.45); font-size: 0.85rem; margin-top: 2rem; }
     #MainMenu, footer, .stDeployButton, header { visibility: hidden; display: none !important; }
     @keyframes fadeInDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
@@ -321,13 +319,13 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 3. 基础配置城市数据
+# 3. 核心大盘城市数据
 # ==========================================
 CHINA_CITIES = ["北京", "上海", "广州", "深圳", "杭州", "成都", "武汉", "南京", "西安", "重庆", "苏州", "长沙", "东莞", "珠海"]
 OVERSEAS_COUNTRIES = ["美国", "英国", "加拿大", "澳大利亚", "新加坡", "日本", "其他"]
 
 # ==========================================
-# 4. 文本解析函数
+# 4. 文本深度读取与匹配算法
 # ==========================================
 def extract_text(file):
     if file is None: return None
@@ -351,17 +349,17 @@ def extract_cities_from_resume(text):
     return list(dict.fromkeys(found_cities))[:3]
 
 # ==========================================
-# 5. 会话状态初始化
+# 5. Session 状态机初始化
 # ==========================================
 for key, val in [("app_stage", "input"), ("loading", False), ("resume_content", ""), ("jd_content", ""), ("detected_cities", [])]:
     if key not in st.session_state: st.session_state[key] = val
 
 # ==========================================
-# 6. 渲染逻辑：数据源输入页
+# 6. 核心渲染阶段 1：数据源输入主界面
 # ==========================================
 if st.session_state.app_stage == "input":
 
-    # 标题放进毛玻璃卡片
+    # 标题包裹进专属流光毛玻璃卡片
     st.markdown("""
     <div class="title-glass-card">
         <h1 class="main-header">💼 AutoJob-Agent</h1>
@@ -369,12 +367,13 @@ if st.session_state.app_stage == "input":
     </div>
     """, unsafe_allow_html=True)
 
-    # 进度树
+    # 极简流式状态轴
     st.markdown('<div class="step-track"><div class="step-node active">1</div><div class="step-line active"></div><div class="step-node">2</div></div>', unsafe_allow_html=True)
 
     col1, col2 = st.columns(2, gap="large")
 
     with col1:
+        # 卡片 1：原始简历上传
         st.markdown('<div class="glass-panel"><h3>📄 原始简历上传</h3>', unsafe_allow_html=True)
         uploaded_resume = st.file_uploader("上传简历", type=["pdf", "docx"], label_visibility="collapsed")
         if uploaded_resume:
@@ -386,12 +385,14 @@ if st.session_state.app_stage == "input":
             st.markdown('<div class="status-chip chip-wait">○ 等待上传</div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
+        # 卡片 2：智能海投策略配置
         st.markdown('<div class="glass-panel"><h3>🤖 智能投递意向</h3>', unsafe_allow_html=True)
         st.selectbox("意向公司类型", ["大厂", "独角兽", "国央企", "外企/跨国公司", "中小型科技公司"])
         st.selectbox("大模型内核", ["DeepSeek-V3 (推荐)", "GPT-4o", "Claude 3.5"])
         st.markdown('</div>', unsafe_allow_html=True)
 
     with col2:
+        # 卡片 3：岗位目标描述注入
         st.markdown('<div class="glass-panel"><h3>🎯 目标岗位 JD</h3>', unsafe_allow_html=True)
         jd_method = st.radio("提供方式", ["手动粘贴文本", "上传 JD 文档"], horizontal=True, label_visibility="collapsed")
         jd_text_raw = ""
@@ -403,6 +404,7 @@ if st.session_state.app_stage == "input":
             if uploaded_jd: jd_text_raw = extract_text(uploaded_jd)
         st.markdown('</div>', unsafe_allow_html=True)
 
+        # 卡片 4：智能意向地区匹配
         st.markdown('<div class="glass-panel"><h3>📍 投递意向地区</h3>', unsafe_allow_html=True)
         if st.session_state.detected_cities:
             st.markdown(f'<div class="city-detected">🎯 已从简历检测到意向城市：{"、".join(st.session_state.detected_cities)}</div>', unsafe_allow_html=True)
@@ -413,6 +415,7 @@ if st.session_state.app_stage == "input":
             st.selectbox("选择目标区域", CHINA_CITIES if scope == "国内" else OVERSEAS_COUNTRIES, label_visibility="collapsed")
         st.markdown('</div>', unsafe_allow_html=True)
 
+    # 提交数据处理网关
     st.markdown("---")
     has_res, has_jd = uploaded_resume is not None, bool(jd_text_raw and len(jd_text_raw.strip()) >= 10)
     
@@ -427,7 +430,7 @@ if st.session_state.app_stage == "input":
             st.rerun()
 
 # ==========================================
-# 7. 渲染逻辑：流式加载中
+# 7. 核心渲染阶段 2：智能流式进度加载页
 # ==========================================
 elif st.session_state.loading:
     p_text, p_bar = st.empty(), st.progress(0)
@@ -443,11 +446,11 @@ elif st.session_state.loading:
     st.rerun()
 
 # ==========================================
-# 8. 渲染逻辑：结果展现页
+# 8. 核心渲染阶段 3：多维并列解析结果展现页
 # ==========================================
 elif st.session_state.app_stage == "result":
 
-    # 结果页的标题也塞进专属毛玻璃卡片
+    # 结果展现页的大标题同样塞进毛玻璃专属长卡片内
     st.markdown("""
     <div class="result-header-glass">
         <h3>🔍 智能解析对比看板</h3>
@@ -461,6 +464,7 @@ elif st.session_state.app_stage == "result":
         st.session_state.app_stage = "input"
         st.rerun()
 
+    # 两栏平铺大视野对比
     res_col1, res_col2 = st.columns(2, gap="large")
 
     with res_col1:
