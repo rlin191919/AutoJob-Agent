@@ -104,11 +104,24 @@ st.markdown("""
         margin-bottom: 1.2rem !important;
     }
 
-    /* 🚨 核心改动：强制大模型下拉框选项列表向下展开 🚨 */
-    [data-baseweb="popover"], .stSelectbox [data-baseweb="menu"] {
-        bottom: auto !important;
-        top: 100% !important;
-        transform: translateY(4px) !important;
+    /* 🚨 修复下拉菜单错位问题：恢复原生相对定位，并优化阴影与圆角 🚨 */
+    [data-baseweb="popover"] {
+        left: auto !important;
+        top: auto !important;
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15) !important;
+        border-radius: 12px !important;
+    }
+    [data-baseweb="menu"] {
+        background-color: rgba(255, 255, 255, 0.95) !important;
+        backdrop-filter: blur(10px) !important;
+        border-radius: 12px !important;
+    }
+    [data-baseweb="menu"] li {
+        color: #1e293b !important;
+        font-weight: 500 !important;
+    }
+    [data-baseweb="menu"] li:hover {
+        background-color: #f1f5f9 !important;
     }
 
     /* 步骤指示器 */
