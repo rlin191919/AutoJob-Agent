@@ -3,6 +3,7 @@ import docx
 import pdfplumber
 import io
 import time
+import re
 
 # ==========================================
 # 1. 页面配置
@@ -395,11 +396,58 @@ st.markdown("""
     ::-webkit-scrollbar-thumb:hover {
         background: rgba(255,255,255,0.3);
     }
+
+    /* 黑体提示文字 */
+    .hint-text {
+        color: rgba(255,255,255,0.95) !important;
+        font-weight: 600 !important;
+        font-size: 0.9rem !important;
+        margin-bottom: 0.5rem !important;
+    }
+
+    /* 城市选择区域 */
+    .city-detected {
+        background: rgba(16, 185, 129, 0.2) !important;
+        backdrop-filter: blur(8px) !important;
+        border: 1px solid rgba(16, 185, 129, 0.3) !important;
+        border-radius: 12px;
+        padding: 0.75rem 1rem;
+        color: #6ee7b7;
+        font-size: 0.9rem;
+        margin-bottom: 1rem;
+        animation: fadeIn 0.4s ease;
+    }
+    .city-not-detected {
+        background: rgba(255, 255, 255, 0.1) !important;
+        backdrop-filter: blur(8px) !important;
+        border: 1px solid rgba(255,255,255,0.15) !important;
+        border-radius: 12px;
+        padding: 0.75rem 1rem;
+        color: rgba(255,255,255,0.7);
+        font-size: 0.9rem;
+        margin-bottom: 1rem;
+    }
 </style>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 3. 文本提取函数
+# 3. 城市数据
+# ==========================================
+CHINA_CITIES = [
+    "北京", "上海", "广州", "深圳", "杭州", "成都", "武汉", "南京", "西安", "重庆",
+    "天津", "苏州", "长沙", "郑州", "青岛", "大连", "厦门", "宁波", "无锡", "佛山",
+    "济南", "合肥", "福州", "东莞", "昆明", "沈阳", "哈尔滨", "长春", "石家庄", "太原",
+    "南昌", "贵阳", "南宁", "兰州", "海口", "乌鲁木齐", "呼和浩特", "银川", "西宁", "拉萨",
+    "温州", "常州", "南通", "徐州", "烟台", "泉州", "唐山", "珠海", "惠州", "中山"
+]
+
+OVERSEAS_COUNTRIES = [
+    "美国", "英国", "加拿大", "澳大利亚", "德国", "法国", "日本", "新加坡", "荷兰", "瑞典",
+    "瑞士", "新西兰", "爱尔兰", "丹麦", "挪威", "芬兰", "奥地利", "比利时", "卢森堡", "其他"
+]
+
+# ==========================================
+# 4. 文本提取函数
 # ==========================================
 def extract_text(file):
     if file is None: 
@@ -424,8 +472,22 @@ def extract_text(file):
     except Exception:
         return None
 
+def extract_cities_from_resume(text):
+    """从简历文本中提取意向城市"""
+    if not text:
+        return []
+
+    # 常见城市关键词匹配
+    found_cities = []
+    for city in CHINA_CITIES:
+        if city in text:
+            found_cities.append(city)
+
+    # 去重并限制数量
+    return list(dict.fromkeys(found_cities))[:3]
+
 # ==========================================
-# 4. 状态管理
+# 5. 状态管理
 # ==========================================
 if "app_stage" not in st.session_state:
     st.session_state.app_stage = "input"
@@ -435,9 +497,17 @@ if "resume_content" not in st.session_state:
     st.session_state.resume_content = ""
 if "jd_content" not in st.session_state:
     st.session_state.jd_content = ""
+if "detected_cities" not in st.session_state:
+    st.session_state.detected_cities = []
+if "city_scope" not in st.session_state:
+    st.session_state.city_scope = "国内"
+if "selected_city" not in st.session_state:
+    st.session_state.selected_city = None
+if "custom_city" not in st.session_state:
+    st.session_state.custom_city = ""
 
 # ==========================================
-# 5. 标题区
+# 6. 标题区
 # ==========================================
 st.markdown("""
 <div class="title-container">
@@ -447,7 +517,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 6. 输入页面
+# 7. 输入页面
 # ==========================================
 if st.session_state.app_stage == "input":
 
@@ -463,7 +533,7 @@ if st.session_state.app_stage == "input":
     col1, col2 = st.columns(2, gap="large")
 
     with col1:
-        # 简历上传
+        # 简历上传 - 毛玻璃包裹
         st.markdown('<div class="glass-panel">', unsafe_allow_html=True)
         st.markdown("### 📄 原始简历上传")
 
@@ -473,20 +543,26 @@ if st.session_state.app_stage == "input":
             label_visibility="collapsed"
         )
 
+        # 上传后自动解析城市
         if uploaded_resume:
+            resume_text_temp = extract_text(uploaded_resume)
+            if resume_text_temp:
+                detected = extract_cities_from_resume(resume_text_temp)
+                st.session_state.detected_cities = detected
             st.markdown(f'<div class="status-chip chip-ready">✓ {uploaded_resume.name}</div>', unsafe_allow_html=True)
         else:
+            st.session_state.detected_cities = []
             st.markdown('<div class="status-chip chip-wait">○ 等待上传</div>', unsafe_allow_html=True)
 
         st.markdown('</div>', unsafe_allow_html=True)
 
-        # 智能设置
+        # 智能投递意向 - 毛玻璃包裹
         st.markdown('<div class="glass-panel">', unsafe_allow_html=True)
         st.markdown("### 🤖 智能投递意向")
 
         target_company = st.selectbox(
-            "意向公司", 
-            ["大厂/独角兽", "外企/跨国公司", "中小型科技公司", "不限"]
+            "意向公司类型", 
+            ["大厂", "独角兽", "国央企", "外企/跨国公司", "中小型科技公司", "不限"]
         )
         model_provider = st.selectbox(
             "大模型内核", 
@@ -495,7 +571,7 @@ if st.session_state.app_stage == "input":
         st.markdown('</div>', unsafe_allow_html=True)
 
     with col2:
-        # JD 输入
+        # 目标岗位 JD - 毛玻璃包裹
         st.markdown('<div class="glass-panel">', unsafe_allow_html=True)
         st.markdown("### 🎯 目标岗位 JD")
 
@@ -508,10 +584,12 @@ if st.session_state.app_stage == "input":
 
         jd_text_raw = ""
         if jd_input_method == "手动粘贴文本":
+            # 黑体提示文字
+            st.markdown('<div class="hint-text">请把招聘软件上的职位描述(JD)粘贴在这里</div>', unsafe_allow_html=True)
             jd_text_raw = st.text_area(
                 "粘贴 JD", 
-                placeholder="请把招聘软件上的职位描述粘贴在这里...", 
-                height=160,
+                placeholder="在此粘贴职位描述...", 
+                height=140,
                 label_visibility="collapsed"
             )
         else:
@@ -526,6 +604,63 @@ if st.session_state.app_stage == "input":
         if jd_text_raw:
             word_count = len(jd_text_raw.strip())
             st.markdown(f'<div style="text-align:right; font-size:0.8rem; color:rgba(255,255,255,0.5); margin-top:0.5rem;">{word_count} 字符</div>', unsafe_allow_html=True)
+
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        # 投递意向地区 - 毛玻璃包裹（新增）
+        st.markdown('<div class="glass-panel">', unsafe_allow_html=True)
+        st.markdown("### 📍 投递意向地区")
+
+        # 检测简历中的城市
+        if st.session_state.detected_cities:
+            cities_str = "、".join(st.session_state.detected_cities)
+            st.markdown(f'<div class="city-detected">🎯 已从简历检测到意向城市：{cities_str}</div>', unsafe_allow_html=True)
+
+            # 使用检测到的城市
+            selected_from_resume = st.selectbox(
+                "确认意向城市",
+                st.session_state.detected_cities + ["其他（手动输入）"],
+                label_visibility="collapsed"
+            )
+
+            if selected_from_resume == "其他（手动输入）":
+                st.session_state.city_scope = "其他"
+                st.session_state.custom_city = st.text_input("输入意向城市", placeholder="例如：三亚", label_visibility="collapsed")
+            else:
+                st.session_state.selected_city = selected_from_resume
+                st.session_state.city_scope = "国内"
+        else:
+            st.markdown('<div class="city-not-detected">○ 未从简历检测到意向城市，请手动选择</div>', unsafe_allow_html=True)
+
+            # 国内/海外选择
+            city_scope = st.radio(
+                "地区范围",
+                ["国内", "海外"],
+                horizontal=True,
+                label_visibility="collapsed"
+            )
+            st.session_state.city_scope = city_scope
+
+            if city_scope == "国内":
+                selected_city = st.selectbox(
+                    "选择城市",
+                    CHINA_CITIES,
+                    label_visibility="collapsed"
+                )
+                st.session_state.selected_city = selected_city
+            else:
+                country = st.selectbox(
+                    "选择国家/地区",
+                    OVERSEAS_COUNTRIES,
+                    label_visibility="collapsed"
+                )
+
+                if country == "其他":
+                    custom_overseas = st.text_input("输入意向城市/国家", placeholder="例如：迪拜", label_visibility="collapsed")
+                    st.session_state.custom_city = custom_overseas
+                    st.session_state.selected_city = custom_overseas
+                else:
+                    st.session_state.selected_city = country
 
         st.markdown('</div>', unsafe_allow_html=True)
 
@@ -560,7 +695,7 @@ if st.session_state.app_stage == "input":
                 st.rerun()
 
 # ==========================================
-# 7. 加载页面
+# 8. 加载页面
 # ==========================================
 elif st.session_state.loading:
 
@@ -588,7 +723,7 @@ elif st.session_state.loading:
     st.rerun()
 
 # ==========================================
-# 8. 结果页面
+# 9. 结果页面
 # ==========================================
 elif st.session_state.app_stage == "result":
 
