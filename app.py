@@ -4,147 +4,166 @@ import pdfplumber
 import io
 
 # ==========================================
-# 1. 页面基本配置
+# 1. 页面配置与流光动画高级 CSS
 # ==========================================
 st.set_page_config(
-    page_title="AutoJob-Agent | 智能求职自动化",
+    page_title="AutoJob-Agent | 智能海投系统",
     page_icon="💼",
     layout="wide"
 )
 
-# 自定义 CSS 样式，让界面更有现代科技感
+# 注入动感流光动画 (Gradient Flow) 和精美样式
 st.markdown("""
 <style>
-    .main-header {font-size: 2.5rem; font-weight: 700; color: #1E3A8A; margin-bottom: 0.5rem;}
-    .sub-header {font-size: 1.1rem; color: #4B5563; margin-bottom: 2rem;}
-    .card {background-color: #F8FAFC; padding: 1.5rem; border-radius: 0.75rem; border: 1px solid #E2E8F0; margin-bottom: 1rem;}
-    .section-title {font-size: 1.25rem; font-weight: 600; color: #0F172A; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;}
+    /* 标题与副标题居中 */
+    .title-container { text-align: center; margin-bottom: 2rem; }
+    .main-header { font-size: 2.8rem; font-weight: 800; color: #1E3A8A; margin-bottom: 0.5rem; }
+    .sub-header { font-size: 1.2rem; color: #4B5563; }
+    
+    /* 流光动画卡片样式 */
+    .flow-card {
+        background: linear-gradient(-45deg, #f8fafc, #f1f5f9, #eff6ff, #f8fafc);
+        background-size: 400% 400%;
+        animation: gradientFlow 15s ease infinite;
+        padding: 1.8rem; 
+        border-radius: 1rem; 
+        border: 1px solid #e2e8f0; 
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        margin-bottom: 1.5rem;
+    }
+    
+    /* 结果页并列卡片专用样式 */
+    .result-card {
+        background-color: #ffffff;
+        padding: 1.5rem;
+        border-radius: 0.75rem;
+        border-top: 4px solid #3B82F6;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05);
+    }
+    
+    .card-title { font-size: 1.2rem; font-weight: 600; color: #1E3A8A; margin-bottom: 1rem; text-align: center;}
+
+    /* 炫彩流动动画关键帧 */
+    @keyframes gradientFlow {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+    }
 </style>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. 文本提取核心函数
+# 2. 文本提取函数
 # ==========================================
-def extract_text_from_pdf(file_bytes):
+def extract_text(file):
+    if file is None: return None
+    file_bytes = file.read()
+    ext = file.name.split(".")[-1].lower()
     try:
         text = ""
-        with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
-            for page in pdf.pages:
-                page_text = page.extract_text()
-                if page_text: text += page_text + "\n"
-        return (text, None) if text.strip() else (None, "PDF文件内容空或为纯图片扫描件")
-    except Exception as e:
-        return None, f"PDF解析失败: {str(e)}"
-
-def extract_text_from_docx(file_bytes):
-    try:
-        text = ""
-        doc = docx.Document(io.BytesIO(file_bytes))
-        for p in doc.paragraphs:
-            if p.text: text += p.text + "\n"
-        for table in doc.tables:
-            for row in table.rows:
-                text += " | ".join([cell.text.strip() for cell in row.cells if cell.text.strip()]) + "\n"
-        return (text, None) if text.strip() else (None, "Word文件内容为空")
-    except Exception as e:
-        return None, f"Word解析失败: {str(e)}"
+        if ext == "pdf":
+            with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+                for page in pdf.pages:
+                    if page.extract_text(): text += page.extract_text() + "\n"
+        elif ext == "docx":
+            doc = docx.Document(io.BytesIO(file_bytes))
+            for p in doc.paragraphs: text += p.text + "\n"
+            for table in doc.tables:
+                for row in table.rows:
+                    text += " | ".join([c.text.strip() for c in row.cells if c.text.strip()]) + "\n"
+        return text.strip() if text.strip() else None
+    except Exception:
+        return None
 
 # ==========================================
-# 3. 前端 UI 交互界面
+# 3. 页面多维流式交互控制 (Session State)
 # ==========================================
+# 使用 Streamlit 状态机，默认是输入页面（Stage 1）
+if "app_stage" not in st.session_state:
+    st.session_state.app_stage = "input_page"
 
-# 顶部导航与品牌区
-st.markdown('<div class="main-header"> AutoJob-Agent</div>', unsafe_allow_html=True)
-st.markdown('<div class="sub-header">基于大模型的智能简历精准润色与海投一体化看板</div>', unsafe_allow_html=True)
+# 顶部居中标题区
+st.markdown(f"""
+<div class="title-container">
+    <div class="main-header">💼 AutoJob-Agent</div>
+    <div class="sub-header">基于大模型的智能简历精准润色与海投一体化看板</div>
+</div>
+""", unsafe_allow_html=True)
 
-# 核心功能区：采用两栏平铺布局，左侧输入，右侧输出
-main_col1, main_col2 = st.columns([1, 1], gap="large")
-
-with main_col1:
-    st.markdown('<div class="section-title">📥 输入数据源</div>', unsafe_allow_html=True)
+# ------------------------------------------
+# 页面一：数据源输入页
+# ------------------------------------------
+if st.session_state.app_stage == "input_page":
     
-    # 模块一：简历上传卡片
-    with st.container():
-        st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.markdown("📑 **第一步：提供您的原始简历**")
-        uploaded_resume = st.file_uploader(
-            "支持 PDF / DOCX 格式", type=["pdf", "docx"], key="resume_uploader", label_visibility="collapsed"
-        )
+    col1, col2 = st.columns(2, gap="large")
+    
+    with col1:
+        st.markdown('<div class="flow-card">', unsafe_allow_html=True)
+        st.markdown("### 📄 原始简历上传")
+        uploaded_resume = st.file_uploader("支持 PDF 或 DOCX 格式简历", type=["pdf", "docx"], label_visibility="collapsed")
         st.markdown('</div>', unsafe_allow_html=True)
         
-    # 模块二：岗位 JD 输入卡片
-    with st.container():
-        st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.markdown("🎯 **第二步：指定目标岗位 JD (Job Description)**")
+        st.markdown('<div class="flow-card">', unsafe_allow_html=True)
+        st.markdown("### 🤖 智能投递意向设置")
+        target_company = st.selectbox("意向公司类型", ["大厂/独角兽", "外企/跨国公司", "中小型科技公司", "不限"])
+        model_provider = st.selectbox("大模型内核驱动", ["DeepSeek-V3 (推荐)", "GPT-4o", "Claude 3.5"])
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with col2:
+        st.markdown('<div class="flow-card">', unsafe_allow_html=True)
+        st.markdown("### 🎯 目标岗位 JD (Job Description)")
         jd_input_method = st.radio("选择提供方式", ["手动粘贴文本", "上传 JD 文档"], horizontal=True)
         
-        jd_text = ""
+        jd_text_raw = ""
         if jd_input_method == "手动粘贴文本":
-            jd_text = st.text_area("请把招聘软件上的职位描述(JD)粘贴在这里...", height=180, placeholder="例如：负责开发大模型 Agent，精通 Python...")
+            jd_text_raw = st.text_area("请把招聘软件上的职位描述(JD)粘贴在这里...", height=195)
         else:
-            uploaded_jd = st.file_uploader("支持 PDF / DOCX 格式 JD", type=["pdf", "docx"], key="jd_uploader")
-            if uploaded_jd:
-                jd_bytes = uploaded_jd.read()
-                jd_ext = uploaded_jd.name.split(".")[-1].lower()
-                if jd_ext == "pdf":
-                    jd_text, _ = extract_text_from_pdf(jd_bytes)
-                else:
-                    jd_text, _ = extract_text_from_docx(jd_bytes)
+            uploaded_jd = st.file_uploader("上传 JD 文件", type=["pdf", "docx"])
+            if uploaded_jd: jd_text_raw = extract_text(uploaded_jd)
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # 模块三：投递意向偏好
-    with st.container():
-        st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.markdown("🤖 **第三步：智能投递意向设置**")
-        pref_col1, pref_col2 = st.columns(2)
-        with pref_col1:
-            target_company = st.selectbox("意向公司类型", ["大厂/独角兽", "外企/跨国公司", "中小型科技公司", "不限"])
-        with pref_col2:
-            model_provider = st.selectbox("大模型内核驱动", ["DeepSeek-V3 (推荐)", "GPT-4o", "Claude 3.5 Sonnet"])
+    # 提交校验按钮
+    st.markdown("---")
+    if st.button("✨ 一键开始智能匹配与解析", type="primary", use_container_width=True):
+        resume_text = extract_text(uploaded_resume)
         
-        # 激活核心优化按钮
-        start_btn = st.button("✨ 一键开始智能匹配与优化", type="primary", use_container_width=True)
+        # 严密的拦截机制：必须两者都全才能跳转
+        if not resume_text:
+            st.error("❌ 请先上传有效的简历文件！")
+        elif not jd_text_raw or len(jd_text_raw.strip()) < 10:
+            st.error("❌ 请先输入或上传完整的目标岗位 JD！")
+        else:
+            # 校验通过，把数据存入缓存，并切换状态到解析结果页
+            st.session_state.resume_content = resume_text
+            st.session_state.jd_content = jd_text_raw
+            st.session_state.app_stage = "result_page"
+            st.rerun() # 重新刷新页面，直接切页
+
+# ------------------------------------------
+# 页面二：动态弹出的解析结果展示页
+# ------------------------------------------
+elif st.session_state.app_stage == "result_page":
+    
+    st.success("🎉 数据校验成功！Agent 已完成深度流式解析视图。")
+    
+    # 退出当前结果页的按钮，方便随时返回修改
+    if st.button("↩️ 返回修改输入数据", type="secondary"):
+        st.session_state.app_stage = "input_page"
+        st.rerun()
+
+    st.markdown("### 🔍 Agent 实时解析与视图")
+    
+    # 两栏布局，让简历解析结果和岗位 JD 平铺对比显示
+    res_col1, res_col2 = st.columns(2, gap="large")
+    
+    with res_col1:
+        st.markdown('<div class="result-card">', unsafe_allow_html=True)
+        st.markdown('<div class="card-title">📄 简历解析结果</div>', unsafe_allow_html=True)
+        st.text_area("提取的简历纯文本上下文：", value=st.session_state.resume_content, height=450, disabled=True, label_visibility="collapsed")
         st.markdown('</div>', unsafe_allow_html=True)
-
-with main_col2:
-    st.markdown('<div class="section-title">🔍 Agent 实时解析与视图</div>', unsafe_allow_html=True)
-    
-    # 使用 Tabs 标签页让数据展示极其整洁优雅
-    tab1, tab2 = st.tabs(["📄 简历解析结果", "🎯 目标岗位 JD 视图"])
-    
-    with tab1:
-        if uploaded_resume:
-            resume_bytes = uploaded_resume.read()
-            resume_ext = uploaded_resume.name.split(".")[-1].lower()
-            
-            with st.spinner("Agent 正在深度读取简历..."):
-                res_text, err = extract_text_from_pdf(resume_bytes) if resume_ext == "pdf" else extract_text_from_docx(resume_bytes)
-                
-                if err:
-                    st.error(err)
-                else:
-                    st.success(f"✅ 成功解析简历 ({len(res_text)} 字)")
-                    st.text_area("简历上下文数据：", value=res_text, height=350, disabled=True, key="resume_view")
-        else:
-            st.info("💡 请在左侧上传简历文件")
-            
-    with tab2:
-        if jd_text:
-            st.success(f"✅ 成功锁定岗位目标 ({len(jd_text)} 字)")
-            st.text_area("目标岗位上下文数据：", value=jd_text, height=350, disabled=True, key="jd_view")
-        else:
-            st.info("💡 请在左侧粘贴或上传岗位 JD 描述")
-
-# ==========================================
-# 4. 🛠️ 纯开发者隐藏视图 (不影响普通用户交互)
-# ==========================================
-st.markdown("---")
-with st.expander("🛠️ 开发者专用控制台 (Debug Console)"):
-    st.caption("当前处于 Phase 1 开发环境。生产部署时此控制台将自动熔断隐藏。")
-    dev_col1, dev_col2, dev_col3 = st.columns(3)
-    dev_col1.metric("前端路由状态", "Streamlit 进程正常")
-    dev_col2.metric("LLM 接口通道", "未连接 (等待 Phase 2)", delta="-100%")
-    dev_col3.metric("浏览器自动化驱动", "未初始化", delta="0")
-    
-    if start_btn:
-        st.warning("⚠️ 触发测试：您点击了优化按钮。当前后端 LLM 未绑定，已拦截本次请求。核心 Prompt 逻辑将在 Phase 2 激活。")
+        
+    with res_col2:
+        st.markdown('<div class="result-card">', unsafe_allow_html=True)
+        st.markdown('<div class="card-title">🎯 目标岗位 JD 视图</div>', unsafe_allow_html=True)
+        st.text_area("锁定的岗位 JD 上下文：", value=st.session_state.jd_content, height=450, disabled=True, label_visibility="collapsed")
+        st.markdown('</div>', unsafe_allow_html=True)
