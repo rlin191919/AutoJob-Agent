@@ -3,415 +3,758 @@ import docx
 import pdfplumber
 import io
 import time
-import re
-from typing import Optional, Tuple, List, Dict
 
-# =====================================================================
-# [SECTION 1] 页面初始化与全局配置 (Page Configuration)
-# =====================================================================
+# ==========================================
+# 1. 页面配置
+# ==========================================
 st.set_page_config(
-    page_title="AutoJob-Agent | 生产级智能海投系统",
-    page_icon="🌌",
+    page_title="AutoJob-Agent | 智能海投系统",
+    page_icon="💼",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
-# =====================================================================
-# [SECTION 2] 核心交互引擎与全域动画 CSS (Advanced UI/UX Engine)
-# =====================================================================
-def inject_custom_css():
-    """
-    注入经过极简瘦身与交互增强的全局 CSS。
-    重点包含：极致紧凑毛玻璃、全域 Hover 动效、强制向下展开机制。
-    """
-    st.markdown("""
-    <style>
-        /* -----------------------------------------------------------
-           1. 全局字体与流光动态背景
-           ----------------------------------------------------------- */
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-        * { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
-        
-        .stApp {
-            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 50%, #4facfe 100%) !important;
-            background-size: 300% 300% !important;
-            animation: bgShift 15s ease infinite !important;
-        }
-        @keyframes bgShift { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+# ==========================================
+# 2. 高级 CSS - 紧凑毛玻璃 + 原位下拉 + 微交互动画
+# ==========================================
+st.markdown("""
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
-        /* 主容器瘦身 */
-        .block-container { padding: 1.5rem 2rem !important; max-width: 1080px !important; }
+    * {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        box-sizing: border-box;
+    }
 
-        /* -----------------------------------------------------------
-           2. 极简毛玻璃卡片引擎 (极致紧凑 + 交互颜色变动)
-           ----------------------------------------------------------- */
-        .glass-panel {
-            background: rgba(255, 255, 255, 0.12) !important;
-            backdrop-filter: blur(20px) saturate(180%) !important;
-            -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
-            /* 🚨 核心瘦身：极小的内边距，刚好包裹内容 */
-            padding: 14px 16px !important; 
-            border-radius: 12px !important; /* 紧凑圆角 */
-            border: 1px solid rgba(255, 255, 255, 0.2) !important;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05) !important;
-            margin-bottom: 12px !important; /* 减少卡片间距 */
-            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) !important;
-            position: relative;
-            overflow: visible !important; /* 允许下拉框溢出 */
-        }
-        
-        /* 🖱️ 交互动画：鼠标悬停时的颜色微变与轻微上浮 */
-        .glass-panel:hover {
-            background: rgba(255, 255, 255, 0.22) !important; /* 颜色微亮 */
-            border: 1px solid rgba(255, 255, 255, 0.4) !important; /* 边框发光 */
-            transform: translateY(-2px); /* 轻微上移 */
-            box-shadow: 0 8px 24px rgba(0,0,0,0.1) !important;
-        }
+    .stApp {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 26%, #f093fb 52%, #6dd5ed 76%, #667eea 100%) !important;
+        background-size: 420% 420% !important;
+        animation: gradientShift 18s ease infinite !important;
+    }
 
-        /* 卡片标题紧凑化 */
-        .glass-panel h3 {
-            color: rgba(255,255,255,0.95) !important;
-            font-size: 1rem !important;
-            font-weight: 700 !important;
-            margin: 0 0 8px 0 !important; /* 底部留白极小化 */
-            transition: color 0.3s ease;
-        }
-        .glass-panel:hover h3 { color: #ffffff !important; }
+    @keyframes gradientShift {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+    }
 
-        /* -----------------------------------------------------------
-           3. 🚨 BaseWeb 组件降维打击：绝对向下展开与限高 🚨
-           ----------------------------------------------------------- */
-        /* 锁定弹窗顶层位置 */
-        div[data-baseweb="popover"] {
-            top: 100% !important; /* 强行对齐父级底部 */
-            bottom: auto !important; 
-            transform: translateY(4px) !important; /* 取消复杂的矩阵运算，改为固定位移 */
-            margin: 0 !important;
-        }
-        
-        /* 限制菜单高度与内部样式 */
-        div[data-baseweb="popover"] > div, ul[role="listbox"] {
-            max-height: 180px !important; /* 极限控高，绝对不会因为空间不足上弹 */
-            overflow-y: auto !important;
-            background-color: rgba(255, 255, 255, 0.95) !important;
-            backdrop-filter: blur(12px) !important;
-            border-radius: 8px !important;
-            border: 1px solid rgba(255,255,255,0.4) !important;
-            padding: 4px !important;
-        }
-        
-        /* 下拉选项悬停动效 */
-        ul[role="listbox"] li {
-            padding: 8px 12px !important;
-            font-size: 0.85rem !important;
-            color: #1e293b !important;
-            border-radius: 6px !important;
-            transition: background 0.2s ease;
-        }
-        ul[role="listbox"] li:hover { background-color: #e0f2fe !important; }
+    .block-container {
+        padding: 1.15rem 1.6rem !important;
+        max-width: 1060px !important;
+    }
 
-        /* -----------------------------------------------------------
-           4. 交互组件深度美化 (输入框、选择器、上传区全域 Hover)
-           ----------------------------------------------------------- */
-        /* 输入框与选择器底框 */
-        .stTextArea textarea, div[data-baseweb="select"] > div {
-            background: rgba(0, 0, 0, 0.1) !important;
-            border: 1px solid rgba(255,255,255,0.15) !important;
-            border-radius: 8px !important;
-            color: #ffffff !important;
-            font-size: 0.85rem !important;
-            padding: 8px 12px !important;
-            transition: all 0.3s ease !important;
-        }
-        .stTextArea textarea:hover, div[data-baseweb="select"] > div:hover {
-            background: rgba(0, 0, 0, 0.18) !important;
-            border-color: rgba(255,255,255,0.3) !important;
-        }
-        .stTextArea textarea:focus {
-            background: rgba(0, 0, 0, 0.25) !important;
-            border-color: #6ee7b7 !important;
-            box-shadow: 0 0 0 2px rgba(110, 231, 183, 0.2) !important;
-        }
+    .title-glass-card {
+        background: rgba(255, 255, 255, 0.13) !important;
+        backdrop-filter: blur(24px) saturate(180%) !important;
+        -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+        padding: 0.9rem 1.2rem;
+        border-radius: 18px;
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        box-shadow: 0 10px 30px rgba(31, 38, 135, 0.16);
+        text-align: center;
+        margin-bottom: 1.05rem;
+        animation: fadeInDown 0.75s ease-out both;
+        transition: 0.35s ease;
+    }
 
-        /* 提示文字微调 */
-        .hint-text { color: rgba(255,255,255,0.8) !important; font-size: 0.8rem !important; margin-bottom: 4px !important; }
+    .title-glass-card:hover {
+        background: rgba(255, 255, 255, 0.18) !important;
+        transform: translateY(-2px);
+    }
 
-        /* 状态胶囊 */
-        .status-chip { display: inline-flex; align-items: center; padding: 2px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; transition: all 0.3s ease; }
-        .chip-ready { background: rgba(16, 185, 129, 0.2); color: #a7f3d0; border: 1px solid rgba(16,185,129,0.3); }
-        .chip-wait { background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.6); border: 1px solid rgba(255,255,255,0.1); }
-        
-        /* 智能按钮流光动效 */
-        .stButton > button[kind="primary"] {
-            background: linear-gradient(135deg, rgba(255,255,255,0.2), rgba(255,255,255,0.3)) !important;
-            backdrop-filter: blur(10px) !important;
-            border: 1px solid rgba(255, 255, 255, 0.5) !important;
-            border-radius: 10px !important;
-            color: #ffffff !important;
-            font-weight: 600 !important;
-            font-size: 0.95rem !important;
-            height: 42px !important;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-        }
-        .stButton > button[kind="primary"]:hover {
-            background: linear-gradient(135deg, rgba(255,255,255,0.3), rgba(255,255,255,0.4)) !important;
-            transform: scale(1.02);
-            box-shadow: 0 8px 20px rgba(0,0,0,0.15) !important;
-        }
+    .main-header {
+        font-size: 2.25rem;
+        font-weight: 800;
+        color: rgba(255,255,255,0.96);
+        margin: 0 0 0.15rem 0;
+        letter-spacing: -0.02em;
+    }
 
-        /* 隐藏无用组件 */
-        #MainMenu, footer, header { visibility: hidden; display: none !important; }
-    </style>
-    """, unsafe_allow_html=True)
+    .sub-header {
+        font-size: 0.92rem;
+        color: rgba(255,255,255,0.76);
+        margin: 0;
+    }
 
-# =====================================================================
-# [SECTION 3] 业务常量配置 (System Constants)
-# =====================================================================
-class Config:
-    """集中管理系统配置，避免魔法字符串散落"""
-    DOMESTIC_CITIES = ["北京", "上海", "广州", "深圳", "杭州", "成都", "武汉", "南京", "西安", "重庆", "东莞"]
-    OVERSEAS_LOCATIONS = ["北美地区", "欧洲地区", "亚太地区", "其他"]
-    COMPANY_TYPES = ["顶级大厂/独角兽", "外企/跨国企业", "中小型科技公司", "国企/央企", "不限"]
-    LLM_MODELS = ["DeepSeek-V3 (推荐)", "GPT-4o", "Claude-3.5-Sonnet"]
-    MIN_JD_LENGTH = 15
+    /* 瘦身后的毛玻璃卡片：更小 padding、更小间距，紧紧包裹内容 */
+    .glass-panel {
+        background: rgba(255, 255, 255, 0.145) !important;
+        backdrop-filter: blur(24px) saturate(180%) !important;
+        -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+        padding: 0.78rem 0.95rem 0.82rem !important;
+        border-radius: 15px;
+        border: 1px solid rgba(255, 255, 255, 0.24);
+        box-shadow: 0 6px 22px rgba(31, 38, 135, 0.13);
+        margin-bottom: 0.65rem !important;
+        transition: transform 0.28s ease, background 0.28s ease, border-color 0.28s ease, box-shadow 0.28s ease;
+        animation: fadeInUp 0.58s ease-out both;
+    }
 
-# =====================================================================
-# [SECTION 4] 核心服务类：文档解析引擎 (Data Parser Engine)
-# =====================================================================
-class DocumentEngine:
-    """封装底层文档处理逻辑，提升鲁棒性与可维护性"""
-    
-    @staticmethod
-    def parse_pdf(file_bytes: bytes) -> Tuple[Optional[str], Optional[str]]:
-        """安全的 PDF 解析器，捕获损坏文件异常"""
-        try:
-            text = ""
+    .glass-panel:hover {
+        transform: translateY(-3px);
+        background: rgba(255, 255, 255, 0.205) !important;
+        border-color: rgba(255, 255, 255, 0.36);
+        box-shadow: 0 10px 28px rgba(31, 38, 135, 0.18);
+    }
+
+    .glass-panel h3 {
+        color: rgba(255,255,255,0.96) !important;
+        font-weight: 750 !important;
+        font-size: 1.02rem !important;
+        margin: 0 0 0.58rem 0 !important;
+        letter-spacing: 0;
+    }
+
+    /* Streamlit 组件整体收紧 */
+    div[data-testid="stVerticalBlock"] {
+        gap: 0.42rem !important;
+    }
+
+    div[data-testid="stHorizontalBlock"] {
+        gap: 1rem !important;
+    }
+
+    div[data-testid="stWidgetLabel"] {
+        min-height: 0 !important;
+    }
+
+    div[data-testid="stFileUploader"] {
+        padding-top: 0 !important;
+    }
+
+    div[data-testid="stFileUploader"] section {
+        padding: 0.62rem !important;
+        border-radius: 12px !important;
+        background: rgba(255,255,255,0.1) !important;
+        border: 1px dashed rgba(255,255,255,0.32) !important;
+        transition: 0.25s ease;
+    }
+
+    div[data-testid="stFileUploader"] section:hover {
+        background: rgba(255,255,255,0.16) !important;
+        border-color: rgba(255,255,255,0.55) !important;
+    }
+
+    /* 输入框、选择框、文本域微交互 */
+    .stTextArea textarea,
+    div[data-baseweb="select"] > div,
+    div[data-baseweb="input"] input {
+        background: rgba(20, 24, 44, 0.2) !important;
+        border: 1px solid rgba(255,255,255,0.18) !important;
+        border-radius: 10px !important;
+        color: rgba(255,255,255,0.9) !important;
+        transition: background 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease;
+    }
+
+    .stTextArea textarea:hover,
+    div[data-baseweb="select"] > div:hover,
+    div[data-baseweb="input"] input:hover {
+        background: rgba(255,255,255,0.16) !important;
+        border-color: rgba(255,255,255,0.44) !important;
+        box-shadow: 0 0 0 3px rgba(255,255,255,0.08) !important;
+    }
+
+    .stTextArea textarea:focus,
+    div[data-baseweb="select"] > div:focus-within,
+    div[data-baseweb="input"] input:focus {
+        background: rgba(255,255,255,0.18) !important;
+        border-color: rgba(255,255,255,0.62) !important;
+        box-shadow: 0 0 0 3px rgba(255,255,255,0.13) !important;
+    }
+
+    div[data-baseweb="select"] {
+        min-height: 38px !important;
+    }
+
+    div[data-baseweb="select"] > div {
+        min-height: 38px !important;
+    }
+
+    div[data-baseweb="select"] span {
+        color: rgba(255,255,255,0.92) !important;
+        font-size: 0.88rem !important;
+    }
+
+    /* 彻底限制下拉层高度：原位向下展开，内部滚动 */
+    div[data-baseweb="popover"] {
+        z-index: 999999 !important;
+        margin-top: 4px !important;
+        transform-origin: top center !important;
+        animation: dropdownOpen 0.18s ease-out both !important;
+        filter: drop-shadow(0 12px 26px rgba(15, 23, 42, 0.22)) !important;
+    }
+
+    div[data-baseweb="popover"] > div {
+        max-height: 172px !important;
+        overflow: hidden !important;
+        border-radius: 12px !important;
+    }
+
+    [data-baseweb="menu"] {
+        max-height: 172px !important;
+        overflow-y: auto !important;
+        overscroll-behavior: contain !important;
+        background: rgba(255, 255, 255, 0.98) !important;
+        backdrop-filter: blur(18px) saturate(180%) !important;
+        -webkit-backdrop-filter: blur(18px) saturate(180%) !important;
+        border: 1px solid rgba(255,255,255,0.65) !important;
+        border-radius: 12px !important;
+        padding: 0.28rem !important;
+    }
+
+    [data-baseweb="menu"] ul {
+        max-height: 172px !important;
+        overflow-y: auto !important;
+    }
+
+    [data-baseweb="menu"] li {
+        color: #1e293b !important;
+        font-weight: 560 !important;
+        font-size: 0.84rem !important;
+        line-height: 1.25 !important;
+        padding: 7px 10px !important;
+        border-radius: 8px !important;
+        transition: background 0.16s ease, color 0.16s ease, transform 0.16s ease;
+    }
+
+    [data-baseweb="menu"] li:hover,
+    [data-baseweb="menu"] li[aria-selected="true"] {
+        background: linear-gradient(135deg, rgba(102,126,234,0.14), rgba(240,147,251,0.16)) !important;
+        color: #334155 !important;
+        transform: translateX(2px);
+    }
+
+    [data-baseweb="menu"]::-webkit-scrollbar,
+    [data-baseweb="menu"] ul::-webkit-scrollbar {
+        width: 5px;
+    }
+
+    [data-baseweb="menu"]::-webkit-scrollbar-track,
+    [data-baseweb="menu"] ul::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    [data-baseweb="menu"]::-webkit-scrollbar-thumb,
+    [data-baseweb="menu"] ul::-webkit-scrollbar-thumb {
+        background: rgba(100, 116, 139, 0.34);
+        border-radius: 999px;
+    }
+
+    [data-baseweb="menu"]::-webkit-scrollbar-thumb:hover,
+    [data-baseweb="menu"] ul::-webkit-scrollbar-thumb:hover {
+        background: rgba(100, 116, 139, 0.55);
+    }
+
+    @keyframes dropdownOpen {
+        from { opacity: 0; transform: translateY(-5px) scale(0.985); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    .step-track {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0;
+        margin-bottom: 1.05rem;
+    }
+
+    .step-line {
+        width: 46px;
+        height: 2px;
+        background: rgba(255,255,255,0.22);
+    }
+
+    .step-line.active {
+        background: linear-gradient(90deg, rgba(255,255,255,0.55), rgba(255,255,255,0.92));
+    }
+
+    .step-node {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background: rgba(255,255,255,0.12);
+        border: 2px solid rgba(255,255,255,0.34);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.78rem;
+        font-weight: 750;
+        color: rgba(255,255,255,0.68);
+        transition: 0.25s ease;
+    }
+
+    .step-node:hover {
+        background: rgba(255,255,255,0.22);
+        color: white;
+        transform: scale(1.05);
+    }
+
+    .step-node.active {
+        background: rgba(255,255,255,0.26);
+        border-color: rgba(255,255,255,0.85);
+        color: rgba(255,255,255,0.96);
+    }
+
+    .step-node.completed {
+        background: rgba(255,255,255,0.92);
+        border-color: rgba(255,255,255,0.92);
+        color: #667eea;
+    }
+
+    .status-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.32rem;
+        padding: 0.24rem 0.68rem;
+        border-radius: 999px;
+        font-size: 0.74rem;
+        font-weight: 650;
+        transition: 0.22s ease;
+    }
+
+    .status-chip:hover {
+        transform: translateY(-1px);
+        filter: brightness(1.08);
+    }
+
+    .chip-ready {
+        background: rgba(16, 185, 129, 0.24);
+        color: #6ee7b7;
+        border: 1px solid rgba(16, 185, 129, 0.34);
+    }
+
+    .chip-wait {
+        background: rgba(255, 255, 255, 0.11);
+        color: rgba(255,255,255,0.68);
+        border: 1px solid rgba(255,255,255,0.17);
+    }
+
+    .stButton > button {
+        transition: background 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease !important;
+    }
+
+    .stButton > button[kind="primary"] {
+        background: rgba(255, 255, 255, 0.24) !important;
+        backdrop-filter: blur(16px) !important;
+        border: 1px solid rgba(255, 255, 255, 0.42) !important;
+        color: rgba(255,255,255,0.96) !important;
+        border-radius: 12px !important;
+        font-weight: 680 !important;
+        height: 42px !important;
+    }
+
+    .stButton > button[kind="primary"]:hover {
+        background: rgba(255, 255, 255, 0.36) !important;
+        border-color: rgba(255,255,255,0.7) !important;
+        transform: translateY(-2px);
+        box-shadow: 0 10px 24px rgba(31, 38, 135, 0.18);
+    }
+
+    .stButton > button[kind="secondary"] {
+        background: rgba(255,255,255,0.13) !important;
+        color: rgba(255,255,255,0.9) !important;
+        border: 1px solid rgba(255,255,255,0.24) !important;
+        border-radius: 11px !important;
+    }
+
+    .stButton > button[kind="secondary"]:hover {
+        background: rgba(255,255,255,0.22) !important;
+        transform: translateY(-1px);
+    }
+
+    .city-detected,
+    .city-not-detected {
+        border-radius: 9px;
+        padding: 0.46rem 0.65rem;
+        font-size: 0.82rem;
+        margin-bottom: 0.52rem;
+        transition: 0.25s ease;
+    }
+
+    .city-detected {
+        background: rgba(16, 185, 129, 0.16) !important;
+        border: 1px solid rgba(16, 185, 129, 0.28) !important;
+        color: #6ee7b7;
+    }
+
+    .city-not-detected {
+        background: rgba(255, 255, 255, 0.08) !important;
+        border: 1px solid rgba(255,255,255,0.13) !important;
+        color: rgba(255,255,255,0.68);
+    }
+
+    .city-detected:hover,
+    .city-not-detected:hover {
+        background: rgba(255,255,255,0.16) !important;
+        border-color: rgba(255,255,255,0.35) !important;
+    }
+
+    .hint-text {
+        color: rgba(255,255,255,0.9) !important;
+        font-weight: 650 !important;
+        font-size: 0.82rem !important;
+        margin: 0 0 0.35rem 0 !important;
+    }
+
+    .stTextArea textarea {
+        min-height: 108px !important;
+    }
+
+    .result-header-glass {
+        background: rgba(255, 255, 255, 0.15) !important;
+        backdrop-filter: blur(24px) saturate(180%) !important;
+        padding: 0.9rem;
+        border-radius: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        margin-bottom: 1.05rem;
+        text-align: center;
+        animation: fadeInDown 0.65s ease-out both;
+    }
+
+    .result-header-glass h3 {
+        margin: 0 !important;
+        color: rgba(255,255,255,0.96) !important;
+        font-weight: 760 !important;
+        font-size: 1.15rem !important;
+    }
+
+    .result-glass {
+        background: rgba(255, 255, 255, 0.13) !important;
+        backdrop-filter: blur(20px) saturate(150%) !important;
+        padding: 1rem;
+        border-radius: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        transition: 0.28s ease;
+        animation: fadeInUp 0.6s ease-out both;
+    }
+
+    .result-glass:hover {
+        background: rgba(255, 255, 255, 0.18) !important;
+        transform: translateY(-2px);
+    }
+
+    .result-title {
+        font-size: 0.98rem;
+        font-weight: 750;
+        color: rgba(255,255,255,0.96);
+        margin-bottom: 0.2rem;
+    }
+
+    .result-meta {
+        font-size: 0.74rem;
+        color: rgba(255,255,255,0.56);
+        margin-bottom: 0.62rem;
+    }
+
+    .success-glass {
+        background: rgba(16, 185, 129, 0.2) !important;
+        backdrop-filter: blur(16px) !important;
+        border: 1px solid rgba(16, 185, 129, 0.34) !important;
+        color: #6ee7b7 !important;
+        padding: 0.58rem 1rem;
+        border-radius: 10px;
+        font-weight: 560;
+        margin-bottom: 0.88rem;
+        animation: fadeInUp 0.55s ease-out both;
+    }
+
+    .footer-hint {
+        text-align: center;
+        color: rgba(255,255,255,0.48);
+        font-size: 0.78rem;
+        margin-top: 1.15rem;
+    }
+
+    hr {
+        margin: 0.75rem 0 0.85rem !important;
+        border-color: rgba(255,255,255,0.18) !important;
+    }
+
+    #MainMenu,
+    footer,
+    .stDeployButton,
+    header {
+        visibility: hidden;
+        display: none !important;
+    }
+
+    @keyframes fadeInDown {
+        from { opacity: 0; transform: translateY(-14px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(14px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# ==========================================
+# 3. 基础配置城市数据
+# ==========================================
+CHINA_CITIES = ["北京", "上海", "广州", "深圳", "杭州", "成都", "武汉", "南京", "西安", "重庆", "苏州", "长沙", "东莞", "珠海"]
+OVERSEAS_COUNTRIES = ["美国", "英国", "加拿大", "澳大利亚", "新加坡", "日本", "其他"]
+
+# ==========================================
+# 4. 文本解析函数
+# ==========================================
+def extract_text(file):
+    if file is None:
+        return None
+
+    file_bytes = file.read()
+    ext = file.name.split(".")[-1].lower()
+
+    try:
+        text = ""
+
+        if ext == "pdf":
             with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
                 for page in pdf.pages:
-                    extracted = page.extract_text()
-                    if extracted: text += extracted + "\n"
-            return text.strip() if text.strip() else None, None
-        except Exception as e:
-            return None, f"PDF 解析失败: {str(e)}"
+                    page_text = page.extract_text()
+                    if page_text:
+                        text += page_text + "\n"
 
-    @staticmethod
-    def parse_docx(file_bytes: bytes) -> Tuple[Optional[str], Optional[str]]:
-        """安全的 DOCX 解析器，包含段落与表格遍历"""
-        try:
-            text = ""
+        elif ext == "docx":
             doc = docx.Document(io.BytesIO(file_bytes))
-            for para in doc.paragraphs:
-                if para.text: text += para.text + "\n"
-            for table in doc.tables:
-                for row in table.rows:
-                    text += " | ".join([c.text.strip() for c in row.cells if c.text.strip()]) + "\n"
-            return text.strip() if text.strip() else None, None
-        except Exception as e:
-            return None, f"DOCX 解析失败: {str(e)}"
+            for p in doc.paragraphs:
+                text += p.text + "\n"
 
-    @classmethod
-    def process_upload(cls, uploaded_file) -> Optional[str]:
-        """门面模式：统一处理入口"""
-        if not uploaded_file: return None
-        ext = uploaded_file.name.split('.')[-1].lower()
-        file_bytes = uploaded_file.read()
-        
-        if ext == 'pdf':
-            content, _ = cls.parse_pdf(file_bytes)
-        elif ext == 'docx':
-            content, _ = cls.parse_docx(file_bytes)
-        else:
-            return None
-        return content
+        return text.strip() if text.strip() else None
 
-# =====================================================================
-# [SECTION 5] 核心服务类：智能分析器 (Intelligence Analyzer)
-# =====================================================================
-class IntelligenceAnalyzer:
-    """负责在 Phase 1 阶段基于规则对文本进行轻量级预分析"""
-    
-    @staticmethod
-    def extract_intent_cities(text: str, candidate_cities: List[str]) -> List[str]:
-        """简单的规则引擎：从简历文本中嗅探意向城市"""
-        if not text: return []
-        # 使用正则表达式提高匹配准确度，避免子串误判
-        detected = []
-        for city in candidate_cities:
-            if re.search(r'\b' + re.escape(city) + r'\b', text) or city in text:
-                detected.append(city)
-        return list(dict.fromkeys(detected))[:3] # 去重并最多返回3个
+    except Exception:
+        return None
 
-# =====================================================================
-# [SECTION 6] 状态机管理器 (State Machine Control)
-# =====================================================================
-def init_session_state():
-    """集中初始化和管理所有的上下文状态变量"""
-    default_states = {
-        "stage": "INPUT",            # 当前应用阶段: INPUT -> PROCESSING -> RESULT
-        "resume_raw": "",            # 提取的原始简历文本
-        "jd_raw": "",                # 提取的原始 JD 文本
-        "detected_cities": [],       # 自动检测的城市列表
-        "pref_company_type": "",     # 用户偏好：公司类型
-        "pref_location": ""          # 用户偏好：最终锁定地区
-    }
-    for key, value in default_states.items():
-        if key not in st.session_state:
-            st.session_state[key] = value
 
-# =====================================================================
-# [SECTION 7] UI 渲染模块：输入层 (UI Controller - Input Stage)
-# =====================================================================
-def render_input_stage():
-    """渲染主数据输入界面，采用高度模块化的列式布局"""
-    
-    # 顶部极简标题
+def extract_cities_from_resume(text):
+    if not text:
+        return []
+
+    found_cities = [city for city in CHINA_CITIES if city in text]
+    return list(dict.fromkeys(found_cities))[:3]
+
+
+# ==========================================
+# 5. 会话状态初始化
+# ==========================================
+for key, val in [
+    ("app_stage", "input"),
+    ("loading", False),
+    ("resume_content", ""),
+    ("jd_content", ""),
+    ("detected_cities", [])
+]:
+    if key not in st.session_state:
+        st.session_state[key] = val
+
+
+# ==========================================
+# 6. 渲染逻辑：数据源输入页
+# ==========================================
+if st.session_state.app_stage == "input":
+
     st.markdown("""
-    <div style="text-align: center; margin-bottom: 20px;">
-        <h1 style="color: white; font-size: 2.2rem; margin: 0; text-shadow: 0 2px 10px rgba(0,0,0,0.1);">💼 AutoJob-Agent</h1>
-        <p style="color: rgba(255,255,255,0.8); font-size: 0.9rem; margin: 0;">智能简历解析与意向映射中枢</p>
+    <div class="title-glass-card">
+        <h1 class="main-header">💼 AutoJob-Agent</h1>
+        <p class="sub-header">基于大模型的智能简历精准润色与海投一体化看板</p>
     </div>
     """, unsafe_allow_html=True)
 
-    col_left, col_right = st.columns(2, gap="medium")
+    st.markdown(
+        '<div class="step-track">'
+        '<div class="step-node active">1</div>'
+        '<div class="step-line active"></div>'
+        '<div class="step-node">2</div>'
+        '</div>',
+        unsafe_allow_html=True
+    )
 
-    # ----- 左侧模块：简历与意向配置 -----
-    with col_left:
-        # [卡片 1] 简历源数据
-        st.markdown('<div class="glass-panel"><h3>📄 原始简历输入</h3>', unsafe_allow_html=True)
-        resume_file = st.file_uploader("Upload Resume", type=["pdf", "docx"], label_visibility="collapsed")
-        
-        if resume_file:
-            # 实时解析并更新状态
-            parsed_text = DocumentEngine.process_upload(resume_file)
-            if parsed_text:
-                st.session_state.detected_cities = IntelligenceAnalyzer.extract_intent_cities(parsed_text, Config.DOMESTIC_CITIES)
-                st.markdown(f'<div class="status-chip chip-ready">✓ 简历已缓存 ({len(parsed_text)} 字符)</div>', unsafe_allow_html=True)
-            else:
-                st.error("文件内容提取失败，请检查格式。")
+    col1, col2 = st.columns(2, gap="large")
+
+    with col1:
+        st.markdown('<div class="glass-panel"><h3>📄 原始简历上传</h3>', unsafe_allow_html=True)
+        uploaded_resume = st.file_uploader("上传简历", type=["pdf", "docx"], label_visibility="collapsed")
+
+        if uploaded_resume:
+            resume_text_temp = extract_text(uploaded_resume)
+            if resume_text_temp:
+                st.session_state.detected_cities = extract_cities_from_resume(resume_text_temp)
+            st.markdown(f'<div class="status-chip chip-ready">✓ {uploaded_resume.name}</div>', unsafe_allow_html=True)
         else:
             st.session_state.detected_cities = []
-            st.markdown('<div class="status-chip chip-wait">○ 等待文件挂载</div>', unsafe_allow_html=True)
+            st.markdown('<div class="status-chip chip-wait">○ 等待上传</div>', unsafe_allow_html=True)
+
         st.markdown('</div>', unsafe_allow_html=True)
 
-        # [卡片 2] 偏好策略引擎
-        st.markdown('<div class="glass-panel"><h3>🤖 投递策略配置</h3>', unsafe_allow_html=True)
-        st.session_state.pref_company_type = st.selectbox("目标企业类型", Config.COMPANY_TYPES, label_visibility="collapsed")
-        _ = st.selectbox("核心驱动模型", Config.LLM_MODELS, label_visibility="collapsed") # 仅作占位展示
+        st.markdown('<div class="glass-panel"><h3>🤖 智能投递意向</h3>', unsafe_allow_html=True)
+        st.selectbox("意向公司类型", ["大厂", "独角兽", "国央企", "外企/跨国公司", "中小型科技公司"])
+        st.selectbox("大模型内核", ["DeepSeek-V3 (推荐)", "GPT-4o", "Claude 3.5"])
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # ----- 右侧模块：岗位JD与区域配置 -----
-    with col_right:
-        # [卡片 3] JD 上下文注入
+    with col2:
         st.markdown('<div class="glass-panel"><h3>🎯 目标岗位 JD</h3>', unsafe_allow_html=True)
-        st.markdown('<div class="hint-text">文本直贴 / 文档解析</div>', unsafe_allow_html=True)
-        
-        jd_mode = st.radio("Mode", ["TEXT", "FILE"], horizontal=True, label_visibility="collapsed")
-        jd_input_text = ""
-        
-        if jd_mode == "TEXT":
-            jd_input_text = st.text_area("JD Input", placeholder="在此粘贴目标岗位的职责与要求...", height=90, label_visibility="collapsed")
+        jd_method = st.radio("提供方式", ["手动粘贴文本", "上传 JD 文档"], horizontal=True, label_visibility="collapsed")
+        jd_text_raw = ""
+
+        if jd_method == "手动粘贴文本":
+            st.markdown('<div class="hint-text">请把招聘软件上的职位描述(JD)粘贴在这里</div>', unsafe_allow_html=True)
+            jd_text_raw = st.text_area(
+                "粘贴 JD",
+                placeholder="在此粘贴职位描述...",
+                height=110,
+                label_visibility="collapsed"
+            )
         else:
-            jd_file = st.file_uploader("Upload JD", type=["pdf", "docx"], label_visibility="collapsed")
-            if jd_file: jd_input_text = DocumentEngine.process_upload(jd_file)
+            uploaded_jd = st.file_uploader("上传 JD", type=["pdf", "docx"], label_visibility="collapsed")
+            if uploaded_jd:
+                jd_text_raw = extract_text(uploaded_jd)
+
         st.markdown('</div>', unsafe_allow_html=True)
 
-        # [卡片 4] 空间映射器 (地区选择)
-        st.markdown('<div class="glass-panel"><h3>📍 物理意向映射</h3>', unsafe_allow_html=True)
-        
+        st.markdown('<div class="glass-panel"><h3>📍 投递意向地区</h3>', unsafe_allow_html=True)
+
         if st.session_state.detected_cities:
-            city_str = "、".join(st.session_state.detected_cities)
-            st.markdown(f'<div style="color:#6ee7b7; font-size:0.8rem; margin-bottom:8px;">✓ 简历嗅探命中: {city_str}</div>', unsafe_allow_html=True)
-            st.session_state.pref_location = st.selectbox("验证目标区域", st.session_state.detected_cities + ["手动校准..."], label_visibility="collapsed")
+            st.markdown(
+                f'<div class="city-detected">🎯 已从简历检测到意向城市：{"、".join(st.session_state.detected_cities)}</div>',
+                unsafe_allow_html=True
+            )
+            st.selectbox(
+                "确认意向城市",
+                st.session_state.detected_cities + ["其他（手动输入）"],
+                label_visibility="collapsed"
+            )
         else:
-            loc_scope = st.radio("区域范围", ["CN", "GLOBAL"], horizontal=True, label_visibility="collapsed")
-            options = Config.DOMESTIC_CITIES if loc_scope == "CN" else Config.OVERSEAS_LOCATIONS
-            st.session_state.pref_location = st.selectbox("选定目标区域", options, label_visibility="collapsed")
+            st.markdown(
+                '<div class="city-not-detected">○ 未从简历检测到意向城市，请手动选择</div>',
+                unsafe_allow_html=True
+            )
+            scope = st.radio("地区范围", ["国内", "海外"], horizontal=True, label_visibility="collapsed")
+            st.selectbox(
+                "选择目标区域",
+                CHINA_CITIES if scope == "国内" else OVERSEAS_COUNTRIES,
+                label_visibility="collapsed"
+            )
+
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # ----- 动作触发总线 -----
-    is_valid = bool(resume_file is not None and jd_input_text and len(jd_input_text) > Config.MIN_JD_LENGTH)
-    
-    col_status, col_btn = st.columns([2, 1])
-    with col_status:
-        if is_valid:
-            st.markdown('<div class="status-chip chip-ready" style="margin-top:10px;">🟢 Agent 链路已就绪，可启动匹配总线</div>', unsafe_allow_html=True)
-        else:
-            st.markdown('<div class="status-chip chip-wait" style="margin-top:10px;">🟡 等待必要数据源 (简历 / JD) 闭环</div>', unsafe_allow_html=True)
-            
-    with col_btn:
-        if st.button("🚀 启动智能解构与匹配", type="primary", use_container_width=True, disabled=not is_valid):
-            # 将最终校验过的数据写入状态机
-            st.session_state.resume_raw = DocumentEngine.process_upload(resume_file)
-            st.session_state.jd_raw = jd_input_text
-            st.session_state.stage = "PROCESSING"
+    st.markdown("---")
+
+    has_res = uploaded_resume is not None
+    has_jd = bool(jd_text_raw and len(jd_text_raw.strip()) >= 10)
+
+    col_s, col_b = st.columns([1, 2])
+
+    col_s.markdown(
+        '<div class="status-chip chip-ready">✓ 信息已就绪</div>'
+        if (has_res and has_jd)
+        else '<div class="status-chip chip-wait">○ 待完善输入源数据</div>',
+        unsafe_allow_html=True
+    )
+
+    with col_b:
+        if st.button("✨ 一键开始智能匹配", use_container_width=True, disabled=not (has_res and has_jd)):
+            st.session_state.resume_content = extract_text(uploaded_resume)
+            st.session_state.jd_content = jd_text_raw
+            st.session_state.loading = True
             st.rerun()
 
-# =====================================================================
-# [SECTION 8] UI 渲染模块：流式加载与结果层
-# =====================================================================
-def render_processing_stage():
-    """模拟真实 Agent 工作流状态的进度指示器"""
-    st.markdown("<br><br>", unsafe_allow_html=True)
-    msg_container = st.empty()
-    bar = st.progress(0)
-    
-    # 模拟复杂计算任务流
-    tasks = [
-        ("正在解构 PDF/DOCX 语义树...", 25),
-        ("提取能力雷达矩阵...", 50),
-        ("挂载岗位要求上下文...", 75),
-        ("生成多维对比视图...", 100)
+
+# ==========================================
+# 7. 渲染逻辑：流式加载中
+# ==========================================
+elif st.session_state.loading:
+    p_text = st.empty()
+    p_bar = st.progress(0)
+
+    stages = [
+        ("📄 解析简历结构", 30),
+        ("🎯 分析岗位 JD", 60),
+        ("🤖 生成匹配策略", 90),
+        ("✨ 即将完成", 100)
     ]
-    
-    current_progress = 0
-    for task_msg, target_progress in tasks:
-        msg_container.markdown(f"<div style='text-align:center; color:white; font-weight:600;'>{task_msg}</div>", unsafe_allow_html=True)
-        while current_progress < target_progress:
-            current_progress += 2
-            bar.progress(current_progress)
-            time.sleep(0.02)
-            
-    st.session_state.stage = "RESULT"
+
+    for i in range(100):
+        time.sleep(0.015)
+        p_bar.progress(i + 1)
+
+        for text, threshold in stages:
+            if i < threshold:
+                p_text.markdown(
+                    f"<div style='text-align:center; color:white; font-weight:600;'>{text} {i + 1}%</div>",
+                    unsafe_allow_html=True
+                )
+                break
+
+    st.session_state.loading = False
+    st.session_state.app_stage = "result"
     st.rerun()
 
-def render_result_stage():
-    """渲染解析后的数据对比看板"""
-    st.markdown('<div class="glass-panel" style="text-align:center;"><h3>🔍 数据总线解析视图</h3></div>', unsafe_allow_html=True)
-    
-    if st.button("↩ 回滚到配置模式", key="back"):
-        st.session_state.stage = "INPUT"
+
+# ==========================================
+# 8. 渲染逻辑：结果展现页
+# ==========================================
+elif st.session_state.app_stage == "result":
+
+    st.markdown("""
+    <div class="result-header-glass">
+        <h3>🔍 智能解析对比看板</h3>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.markdown(
+        '<div class="step-track">'
+        '<div class="step-node completed">✓</div>'
+        '<div class="step-line active"></div>'
+        '<div class="step-node active">2</div>'
+        '</div>',
+        unsafe_allow_html=True
+    )
+
+    st.markdown(
+        '<div class="success-glass">🎉 Agent 已完成深度解析，以下是实时多维对比视图</div>',
+        unsafe_allow_html=True
+    )
+
+    if st.button("← 返回修改数据", key="back_btn"):
+        st.session_state.app_stage = "input"
         st.rerun()
-        
-    c1, c2 = st.columns(2, gap="medium")
-    
-    with c1:
-        st.markdown('<div class="glass-panel"><h3>📄 Resume 上下文切片</h3>', unsafe_allow_html=True)
-        st.text_area("R", value=st.session_state.resume_raw, height=350, disabled=True, label_visibility="collapsed")
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-    with c2:
-        st.markdown('<div class="glass-panel"><h3>🎯 JD 目标镜像</h3>', unsafe_allow_html=True)
-        st.text_area("J", value=st.session_state.jd_raw, height=350, disabled=True, label_visibility="collapsed")
+
+    res_col1, res_col2 = st.columns(2, gap="large")
+
+    with res_col1:
+        st.markdown('<div class="result-glass">', unsafe_allow_html=True)
+        st.markdown('<div class="result-title">📄 简历解析 results</div>', unsafe_allow_html=True)
+        st.markdown(
+            f'<div class="result-meta">{len(st.session_state.resume_content)} 字符 · 数据已完全解构</div>',
+            unsafe_allow_html=True
+        )
+        st.text_area(
+            "R",
+            value=st.session_state.resume_content,
+            height=400,
+            disabled=True,
+            label_visibility="collapsed"
+        )
         st.markdown('</div>', unsafe_allow_html=True)
 
-# =====================================================================
-# [SECTION 9] 应用主程序入口 (Application Entry Point)
-# =====================================================================
-def main():
-    """主程序路由控制"""
-    inject_custom_css()
-    init_session_state()
-    
-    # 根据状态机路由到不同的 UI 组件
-    current_stage = st.session_state.stage
-    
-    if current_stage == "INPUT":
-        render_input_stage()
-    elif current_stage == "PROCESSING":
-        render_processing_stage()
-    elif current_stage == "RESULT":
-        render_result_stage()
+    with res_col2:
+        st.markdown('<div class="result-glass">', unsafe_allow_html=True)
+        st.markdown('<div class="result-title">🎯 目标岗位 JD</div>', unsafe_allow_html=True)
+        st.markdown(
+            f'<div class="result-meta">{len(st.session_state.jd_content)} 字符 · 上下文已注入容器</div>',
+            unsafe_allow_html=True
+        )
+        st.text_area(
+            "J",
+            value=st.session_state.jd_content,
+            height=400,
+            disabled=True,
+            label_visibility="collapsed"
+        )
+        st.markdown('</div>', unsafe_allow_html=True)
 
-# 启动应用
-if __name__ == "__main__":
-    main()
+    st.markdown(
+        "<div class='footer-hint'>💡 对比视图已生成，后续可接入大模型进行智能润色与匹配分析</div>",
+        unsafe_allow_html=True
+    )
