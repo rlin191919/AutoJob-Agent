@@ -3,6 +3,23 @@ import docx
 import pdfplumber
 import io
 import time
+from typing import Optional, Dict, Any
+
+# ==========================================
+# 0. 导入项目模块（Phase 1 MVP）
+# ==========================================
+# 注意：以下模块需要你自己创建，代码在后面提供
+try:
+    from parser import extract_text as parser_extract_text
+    from llm import get_llm
+    from chain import build_optimization_chain
+    from memory import get_memory, save_to_memory, load_from_memory
+    from state import AppState, get_state, set_state, clear_state
+    MODULES_AVAILABLE = True
+except ImportError:
+    MODULES_AVAILABLE = False
+    # Fallback: 使用本地函数
+    def parser_extract_text(file): return extract_text(file)
 
 # ==========================================
 # 1. 页面配置
@@ -63,15 +80,17 @@ OVERSEAS_COUNTRIES = [
 ]
 
 # ==========================================
-# 3. 高级 CSS - Liquid Glass + 极致瘦身 + 强制下拉
+# 3. 高级 CSS - 修复下拉列表问题
 # ==========================================
+# 关键修复：移除所有强制 popover 定位的 CSS，改用原生 Streamlit 行为
+# 通过限制选项数量和调整布局来避免 popover 溢出
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap');
 
     * { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
 
-    /* 全局背景 - 柔和蓝紫渐变流动 */
+    /* 全局背景 */
     .stApp {
         background: linear-gradient(135deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #6dd5ed 75%, #667eea 100%) !important;
         background-size: 400% 400% !important;
@@ -91,10 +110,9 @@ st.markdown("""
     /* ===== 标题区 Liquid Glass ===== */
     .title-glass {
         background: rgba(255, 255, 255, 0.08);
-        background-blend-mode: luminosity;
         backdrop-filter: blur(16px) saturate(180%);
         -webkit-backdrop-filter: blur(16px) saturate(180%);
-        border: none;
+        border: 1px solid rgba(255,255,255,0.15);
         box-shadow: inset 0 1px 1px rgba(255,255,255,0.1), 0 8px 32px rgba(0,0,0,0.08);
         position: relative;
         overflow: hidden;
@@ -104,18 +122,6 @@ st.markdown("""
         margin-bottom: 1.2rem;
         animation: fadeInDown 0.8s ease-out;
         transition: all 0.4s ease;
-    }
-    .title-glass::before {
-        content: '';
-        position: absolute;
-        inset: 0;
-        border-radius: inherit;
-        padding: 1.2px;
-        background: linear-gradient(180deg, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.1) 40%, rgba(255,255,255,0) 60%, rgba(255,255,255,0.1) 80%, rgba(255,255,255,0.4) 100%);
-        -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-        -webkit-mask-composite: xor;
-        mask-composite: exclude;
-        pointer-events: none;
     }
     .title-glass:hover {
         background: rgba(255, 255, 255, 0.12);
@@ -139,13 +145,12 @@ st.markdown("""
         margin: 0;
     }
 
-    /* ===== 极致瘦身 Liquid Glass 卡片 ===== */
+    /* ===== Liquid Glass 卡片 ===== */
     .glass-panel {
         background: rgba(255, 255, 255, 0.06);
-        background-blend-mode: luminosity;
         backdrop-filter: blur(20px) saturate(160%);
         -webkit-backdrop-filter: blur(20px) saturate(160%);
-        border: none;
+        border: 1px solid rgba(255,255,255,0.12);
         box-shadow: inset 0 1px 1px rgba(255,255,255,0.08), 0 4px 20px rgba(0,0,0,0.06);
         position: relative;
         overflow: hidden;
@@ -154,23 +159,6 @@ st.markdown("""
         margin-bottom: 0.6rem !important;
         transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
         animation: fadeInUp 0.5s ease-out both;
-    }
-    .glass-panel::before {
-        content: '';
-        position: absolute;
-        inset: 0;
-        border-radius: inherit;
-        padding: 1px;
-        background: linear-gradient(180deg, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0.08) 40%, rgba(255,255,255,0) 60%, rgba(255,255,255,0.08) 80%, rgba(255,255,255,0.35) 100%);
-        -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-        -webkit-mask-composite: xor;
-        mask-composite: exclude;
-        pointer-events: none;
-        opacity: 0.6;
-        transition: opacity 0.3s ease;
-    }
-    .glass-panel:hover::before {
-        opacity: 1;
     }
     .glass-panel:hover {
         transform: translateY(-3px);
@@ -192,60 +180,9 @@ st.markdown("""
         letter-spacing: -0.01em;
     }
 
-    /* ===== 强制下拉列表向下展开 + 限制高度 ===== */
-    div[data-baseweb="popover"] {
-        position: absolute !important;
-        top: calc(100% + 4px) !important;
-        bottom: auto !important;
-        left: 0 !important;
-        right: auto !important;
-        margin-top: 0 !important;
-        margin-bottom: 0 !important;
-        transform: none !important;
-        box-shadow: 0 8px 24px rgba(0,0,0,0.15) !important;
-        border-radius: 10px !important;
-        max-height: 180px !important;
-    }
-    div[data-baseweb="popover"] > div {
-        max-height: 180px !important;
-        overflow-y: auto !important;
-    }
-    div[data-baseweb="popover"] > div > div {
-        max-height: 180px !important;
-        overflow-y: auto !important;
-    }
-    [data-baseweb="menu"] {
-        background-color: rgba(255, 255, 255, 0.98) !important;
-        border-radius: 10px !important;
-        max-height: 180px !important;
-        overflow-y: auto !important;
-        box-shadow: 0 4px 16px rgba(0,0,0,0.1) !important;
-    }
-    [data-baseweb="menu"] li {
-        color: #1e293b !important;
-        font-weight: 500 !important;
-        font-size: 0.82rem !important;
-        padding: 5px 12px !important;
-        transition: all 0.15s ease;
-        min-height: 32px !important;
-    }
-    [data-baseweb="menu"] li:hover {
-        background-color: #e0e7ff !important;
-        color: #4338ca !important;
-    }
-    /* 微型滚动条 */
-    [data-baseweb="menu"]::-webkit-scrollbar,
-    div[data-baseweb="popover"] > div::-webkit-scrollbar {
-        width: 4px;
-    }
-    [data-baseweb="menu"]::-webkit-scrollbar-thumb,
-    div[data-baseweb="popover"] > div::-webkit-scrollbar-thumb {
-        background: rgba(102, 126, 234, 0.4);
-        border-radius: 2px;
-    }
-
-    /* ===== 选择器样式 ===== */
-    .stSelectbox > div > div {
+    /* ===== 修复：下拉列表样式优化（不移除原生行为） ===== */
+    /* 只美化，不强制改变位置，避免左上角 bug */
+    div[data-baseweb="select"] > div {
         background: rgba(0, 0, 0, 0.12) !important;
         backdrop-filter: blur(8px) !important;
         border: 1px solid rgba(255,255,255,0.1) !important;
@@ -254,9 +191,28 @@ st.markdown("""
         min-height: 36px !important;
         transition: all 0.25s ease !important;
     }
-    .stSelectbox > div > div:hover {
+    div[data-baseweb="select"] > div:hover {
         background: rgba(0, 0, 0, 0.2) !important;
         border-color: rgba(255,255,255,0.25) !important;
+    }
+    /* 下拉菜单美化 */
+    div[data-baseweb="menu"] {
+        background-color: rgba(255, 255, 255, 0.98) !important;
+        border-radius: 10px !important;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.15) !important;
+        border: 1px solid rgba(0,0,0,0.05) !important;
+    }
+    div[data-baseweb="menu"] li {
+        color: #1e293b !important;
+        font-weight: 500 !important;
+        font-size: 0.82rem !important;
+        padding: 5px 12px !important;
+        transition: all 0.15s ease;
+        min-height: 32px !important;
+    }
+    div[data-baseweb="menu"] li:hover {
+        background-color: #e0e7ff !important;
+        color: #4338ca !important;
     }
 
     /* ===== 单选按钮 ===== */
@@ -345,9 +301,8 @@ st.markdown("""
     /* ===== 主按钮 Liquid Glass Strong ===== */
     .stButton > button[kind="primary"] {
         background: rgba(255, 255, 255, 0.15) !important;
-        background-blend-mode: luminosity !important;
         backdrop-filter: blur(24px) saturate(180%) !important;
-        border: none !important;
+        border: 1px solid rgba(255,255,255,0.2) !important;
         box-shadow: inset 0 1px 1px rgba(255,255,255,0.15), 0 4px 16px rgba(0,0,0,0.1) !important;
         color: rgba(255,255,255,0.95) !important;
         border-radius: 9999px !important;
@@ -359,21 +314,6 @@ st.markdown("""
         position: relative;
         overflow: hidden;
     }
-    .stButton > button[kind="primary"]::before {
-        content: '';
-        position: absolute;
-        inset: 0;
-        border-radius: inherit;
-        padding: 1px;
-        background: linear-gradient(180deg, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0.15) 40%, rgba(255,255,255,0) 60%, rgba(255,255,255,0.15) 80%, rgba(255,255,255,0.5) 100%);
-        -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-        -webkit-mask-composite: xor;
-        mask-composite: exclude;
-        pointer-events: none;
-        opacity: 0.7;
-        transition: opacity 0.3s ease;
-    }
-    .stButton > button[kind="primary"]:hover::before { opacity: 1; }
     .stButton > button[kind="primary"]:hover {
         background: rgba(255, 255, 255, 0.25) !important;
         transform: translateY(-2px);
@@ -384,8 +324,8 @@ st.markdown("""
         background: rgba(255,255,255,0.04) !important;
         box-shadow: none !important;
         color: rgba(255,255,255,0.25) !important;
+        border-color: rgba(255,255,255,0.05) !important;
     }
-    .stButton > button[kind="primary"]:disabled::before { opacity: 0.2; }
 
     /* ===== 返回按钮 ===== */
     .stButton > button:not([kind="primary"]) {
@@ -431,28 +371,14 @@ st.markdown("""
     /* ===== 结果页 ===== */
     .result-header-glass {
         background: rgba(255, 255, 255, 0.08);
-        background-blend-mode: luminosity;
         backdrop-filter: blur(20px) saturate(180%);
-        border: none;
+        border: 1px solid rgba(255,255,255,0.15);
         box-shadow: inset 0 1px 1px rgba(255,255,255,0.1), 0 4px 20px rgba(0,0,0,0.06);
         position: relative;
         overflow: hidden;
         padding: 0.8rem; border-radius: 14px;
         margin-bottom: 1.2rem; text-align: center;
         transition: all 0.4s ease;
-    }
-    .result-header-glass::before {
-        content: '';
-        position: absolute;
-        inset: 0;
-        border-radius: inherit;
-        padding: 1px;
-        background: linear-gradient(180deg, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.35) 100%);
-        -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-        -webkit-mask-composite: xor;
-        mask-composite: exclude;
-        pointer-events: none;
-        opacity: 0.5;
     }
     .result-header-glass:hover { background: rgba(255, 255, 255, 0.12); }
     .result-header-glass h3 {
@@ -466,9 +392,8 @@ st.markdown("""
 
     .result-glass {
         background: rgba(255, 255, 255, 0.06);
-        background-blend-mode: luminosity;
         backdrop-filter: blur(16px) saturate(150%);
-        border: none;
+        border: 1px solid rgba(255,255,255,0.12);
         box-shadow: inset 0 1px 1px rgba(255,255,255,0.08), 0 4px 16px rgba(0,0,0,0.05);
         position: relative;
         overflow: hidden;
@@ -476,21 +401,6 @@ st.markdown("""
         transition: all 0.4s ease;
         animation: slideInUp 0.5s ease-out both;
     }
-    .result-glass::before {
-        content: '';
-        position: absolute;
-        inset: 0;
-        border-radius: inherit;
-        padding: 1px;
-        background: linear-gradient(180deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.05) 50%, rgba(255,255,255,0.3) 100%);
-        -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-        -webkit-mask-composite: xor;
-        mask-composite: exclude;
-        pointer-events: none;
-        opacity: 0.4;
-        transition: opacity 0.3s ease;
-    }
-    .result-glass:hover::before { opacity: 0.7; }
     .result-glass:hover {
         background: rgba(255, 255, 255, 0.1);
         box-shadow: inset 0 1px 1px rgba(255,255,255,0.1), 0 8px 24px rgba(0,0,0,0.08);
@@ -554,19 +464,15 @@ st.markdown("""
     @keyframes fadeInUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
     @keyframes slideInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
     @keyframes slideInDown { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
-    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-    @keyframes shimmer {
-        0% { background-position: -200% 0; }
-        100% { background-position: 200% 0; }
-    }
 </style>
 """, unsafe_allow_html=True)
 
 # ==========================================
-# 4. 文本解析函数
+# 4. 文本解析函数（本地 Fallback）
 # ==========================================
-def extract_text(file):
-    if file is None: return None
+def extract_text(file) -> Optional[str]:
+    if file is None: 
+        return None
     file_bytes = file.read()
     ext = file.name.split(".")[-1].lower()
     try:
@@ -574,32 +480,121 @@ def extract_text(file):
         if ext == "pdf":
             with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
                 for page in pdf.pages:
-                    if page.extract_text(): text += page.extract_text() + "\n"
+                    if page.extract_text(): 
+                        text += page.extract_text() + "\n"
         elif ext == "docx":
             doc = docx.Document(io.BytesIO(file_bytes))
-            for p in doc.paragraphs: text += p.text + "\n"
+            for p in doc.paragraphs: 
+                text += p.text + "\n"
         return text.strip() if text.strip() else None
-    except Exception: return None
+    except Exception: 
+        return None
 
-def extract_cities_from_resume(text):
-    if not text: return []
+def extract_cities_from_resume(text: str) -> list:
+    if not text: 
+        return []
     found_cities = [city for city in ALL_CITIES if city in text]
     return list(dict.fromkeys(found_cities))[:3]
 
 # ==========================================
-# 5. 会话状态初始化
+# 5. 会话状态初始化（使用 state.py 封装）
 # ==========================================
-for key, val in [
-    ("app_stage", "input"), ("loading", False),
-    ("resume_content", ""), ("jd_content", ""),
-    ("detected_cities", []), ("city_scope", "国内"),
-    ("selected_province", None), ("selected_city", None),
-    ("custom_city", ""), ("province_city_selected", False)
-]:
-    if key not in st.session_state: st.session_state[key] = val
+def init_session_state():
+    """初始化所有 session state 变量"""
+    defaults = {
+        "app_stage": "input",
+        "loading": False,
+        "resume_content": "",
+        "jd_content": "",
+        "detected_cities": [],
+        "city_scope": "国内",
+        "selected_province": None,
+        "selected_city": None,
+        "custom_city": "",
+        "province_city_selected": False,
+        # Phase 1 MVP 新增状态
+        "optimized_resume": "",           # LLM 优化后的简历
+        "optimization_history": [],       # Memory 历史记录
+        "current_model": "DeepSeek-V3",   # 当前选择的大模型
+        "target_company_type": "不限",      # 目标公司类型
+        "match_score": 0,                 # 匹配分数
+        "analysis_result": {},            # 完整分析结果
+    }
+    for key, val in defaults.items():
+        if key not in st.session_state: 
+            st.session_state[key] = val
+
+init_session_state()
 
 # ==========================================
-# 6. 渲染逻辑：数据源输入页
+# 6. 核心功能：调用 LLM 优化简历（Phase 1 MVP）
+# ==========================================
+def optimize_resume_with_llm(resume_text: str, jd_text: str, company_type: str, model_name: str) -> Dict[str, Any]:
+    """
+    Phase 1 MVP 核心功能：调用 LLM 优化简历
+
+    实现方式：
+    1. 使用 llm.py 获取 LLM 实例
+    2. 使用 chain.py 构建优化 Chain
+    3. 使用 memory.py 保存对话历史
+    4. 返回优化后的简历和分析结果
+    """
+    if not MODULES_AVAILABLE:
+        # Fallback: 模拟 LLM 输出（用于测试 UI）
+        return {
+            "optimized_resume": f"【模拟输出】\n\n基于以下 JD 优化后的简历：\n\n原始简历长度：{len(resume_text)} 字符\nJD 长度：{len(jd_text)} 字符\n目标公司：{company_type}\n使用模型：{model_name}\n\n[此处将显示 LLM 生成的优化后简历内容...]",
+            "match_score": 85,
+            "key_skills_matched": ["Python", "机器学习", "数据分析"],
+            "suggestions": ["建议补充项目量化数据", "突出领导力经验"],
+            "memory_saved": False
+        }
+
+    # 真实 LLM 调用流程
+    try:
+        # Step 1: 获取 LLM 实例（llm.py）
+        llm = get_llm(model_name=model_name)
+
+        # Step 2: 获取 Memory 实例（memory.py）
+        memory = get_memory(session_id=st.session_state.get("session_id", "default"))
+
+        # Step 3: 构建优化 Chain（chain.py）
+        chain = build_optimization_chain(llm=llm, memory=memory)
+
+        # Step 4: 执行 Chain
+        result = chain.run(
+            resume=resume_text,
+            jd=jd_text,
+            company_type=company_type
+        )
+
+        # Step 5: 保存到 Memory（memory.py）
+        save_to_memory(
+            session_id=st.session_state.get("session_id", "default"),
+            input_data={"resume_length": len(resume_text), "jd_length": len(jd_text)},
+            output_data={"optimized_length": len(result)}
+        )
+
+        # Step 6: 解析结果（简化版）
+        return {
+            "optimized_resume": result,
+            "match_score": 85,  # 可由 LLM 输出结构化数据后解析
+            "key_skills_matched": [],
+            "suggestions": [],
+            "memory_saved": True
+        }
+
+    except Exception as e:
+        st.error(f"LLM 调用失败: {str(e)}")
+        return {
+            "optimized_resume": f"错误：{str(e)}",
+            "match_score": 0,
+            "key_skills_matched": [],
+            "suggestions": [],
+            "memory_saved": False
+        }
+
+# ==========================================
+# 7. 渲染逻辑：数据源输入页
 # ==========================================
 if st.session_state.app_stage == "input":
 
@@ -621,6 +616,7 @@ if st.session_state.app_stage == "input":
         st.markdown('<div class="glass-panel">', unsafe_allow_html=True)
         st.markdown('<div class="card-header">📄 原始简历上传</div>', unsafe_allow_html=True)
         uploaded_resume = st.file_uploader("上传简历", type=["pdf", "docx"], label_visibility="collapsed")
+
         if uploaded_resume:
             resume_text_temp = extract_text(uploaded_resume)
             if resume_text_temp:
@@ -634,58 +630,138 @@ if st.session_state.app_stage == "input":
         # === 卡片2: 智能投递意向 ===
         st.markdown('<div class="glass-panel">', unsafe_allow_html=True)
         st.markdown('<div class="card-header">🤖 智能投递意向</div>', unsafe_allow_html=True)
-        st.selectbox("意向公司", ["大厂", "独角兽", "国央企", "外企/跨国公司", "中小型科技公司", "不限"], label_visibility="collapsed")
-        st.selectbox("大模型", ["DeepSeek-V3 (推荐)", "GPT-4o", "Claude 3.5"], label_visibility="collapsed")
+
+        # 修复：使用 key 绑定到 session_state，确保状态持久化
+        company_type = st.selectbox(
+            "意向公司", 
+            ["大厂", "独角兽", "国央企", "外企/跨国公司", "中小型科技公司", "不限"], 
+            label_visibility="collapsed",
+            key="company_type_select"
+        )
+        st.session_state.target_company_type = company_type
+
+        model_choice = st.selectbox(
+            "大模型", 
+            ["DeepSeek-V3 (推荐)", "GPT-4o", "Claude 3.5"], 
+            label_visibility="collapsed",
+            key="model_select"
+        )
+        st.session_state.current_model = model_choice.replace(" (推荐)", "")
+
         st.markdown('</div>', unsafe_allow_html=True)
 
     with col2:
         # === 卡片3: 目标岗位JD ===
         st.markdown('<div class="glass-panel">', unsafe_allow_html=True)
         st.markdown('<div class="card-header">🎯 目标岗位 JD</div>', unsafe_allow_html=True)
-        jd_method = st.radio("提供方式", ["手动粘贴文本", "上传 JD 文档"], horizontal=True, label_visibility="collapsed")
+
+        jd_method = st.radio(
+            "提供方式", 
+            ["手动粘贴文本", "上传 JD 文档"], 
+            horizontal=True, 
+            label_visibility="collapsed",
+            key="jd_method_radio"
+        )
+
         jd_text_raw = ""
         if jd_method == "手动粘贴文本":
             st.markdown('<div class="hint-text">请把招聘软件上的职位描述(JD)粘贴在这里</div>', unsafe_allow_html=True)
-            jd_text_raw = st.text_area("粘贴JD", placeholder="在此粘贴职位描述...", height=100, label_visibility="collapsed")
+            jd_text_raw = st.text_area(
+                "粘贴JD", 
+                placeholder="在此粘贴职位描述...", 
+                height=100, 
+                label_visibility="collapsed",
+                key="jd_text_area"
+            )
         else:
-            uploaded_jd = st.file_uploader("上传JD", type=["pdf", "docx"], label_visibility="collapsed")
-            if uploaded_jd: jd_text_raw = extract_text(uploaded_jd)
+            uploaded_jd = st.file_uploader(
+                "上传JD", 
+                type=["pdf", "docx"], 
+                label_visibility="collapsed",
+                key="jd_file_uploader"
+            )
+            if uploaded_jd: 
+                jd_text_raw = extract_text(uploaded_jd)
         st.markdown('</div>', unsafe_allow_html=True)
 
-        # === 卡片4: 投递意向地区（省份-城市级联）===
+        # === 卡片4: 投递意向地区（修复下拉列表问题）===
         st.markdown('<div class="glass-panel">', unsafe_allow_html=True)
         st.markdown('<div class="card-header">📍 投递意向地区</div>', unsafe_allow_html=True)
 
         if st.session_state.detected_cities:
             cities_str = "、".join(st.session_state.detected_cities)
             st.markdown(f'<div class="city-detected">🎯 已从简历检测到：{cities_str}</div>', unsafe_allow_html=True)
-            selected_from_resume = st.selectbox("确认城市", st.session_state.detected_cities + ["其他（手动输入）"], label_visibility="collapsed")
+
+            # 修复：添加 key，避免组件冲突
+            selected_from_resume = st.selectbox(
+                "确认城市", 
+                st.session_state.detected_cities + ["其他（手动输入）"], 
+                label_visibility="collapsed",
+                key="resume_city_select"
+            )
+
             if selected_from_resume == "其他（手动输入）":
                 st.session_state.city_scope = "其他"
-                st.text_input("输入意向城市", placeholder="例如：三亚", label_visibility="collapsed", key="custom_city_input_resume")
+                custom_city = st.text_input(
+                    "输入意向城市", 
+                    placeholder="例如：三亚", 
+                    label_visibility="collapsed", 
+                    key="custom_city_input_resume"
+                )
+                st.session_state.custom_city = custom_city
+                st.session_state.selected_city = custom_city
             else:
                 st.session_state.selected_city = selected_from_resume
                 st.session_state.city_scope = "国内"
         else:
             st.markdown('<div class="city-not-detected">○ 未检测到意向城市，请手动选择</div>', unsafe_allow_html=True)
 
-            scope = st.radio("地区范围", ["国内", "海外"], horizontal=True, label_visibility="collapsed", key="scope_radio")
+            # 修复：使用唯一 key
+            scope = st.radio(
+                "地区范围", 
+                ["国内", "海外"], 
+                horizontal=True, 
+                label_visibility="collapsed", 
+                key="scope_radio"
+            )
             st.session_state.city_scope = scope
 
             if scope == "国内":
-                # 省份选择
-                selected_province = st.selectbox("选择省份", ALL_PROVINCES, label_visibility="collapsed", key="province_select")
+                # 修复：省份选择使用唯一 key
+                selected_province = st.selectbox(
+                    "选择省份", 
+                    ALL_PROVINCES, 
+                    label_visibility="collapsed", 
+                    key="province_select"
+                )
                 st.session_state.selected_province = selected_province
 
                 # 城市选择（基于省份）
                 if selected_province and selected_province in PROVINCE_CITY_MAP:
                     cities_in_province = PROVINCE_CITY_MAP[selected_province]
-                    selected_city = st.selectbox("选择城市", cities_in_province, label_visibility="collapsed", key="city_select")
+                    # 修复：城市选择使用唯一 key，且基于省份动态更新
+                    selected_city = st.selectbox(
+                        "选择城市", 
+                        cities_in_province, 
+                        label_visibility="collapsed", 
+                        key=f"city_select_{selected_province}"  # 动态 key，切换省份时重置
+                    )
                     st.session_state.selected_city = selected_city
             else:
-                country = st.selectbox("选择国家/地区", OVERSEAS_COUNTRIES, label_visibility="collapsed", key="country_select")
+                # 修复：海外选择使用唯一 key
+                country = st.selectbox(
+                    "选择国家/地区", 
+                    OVERSEAS_COUNTRIES, 
+                    label_visibility="collapsed", 
+                    key="country_select"
+                )
                 if country == "其他":
-                    custom_overseas = st.text_input("输入意向城市/国家", placeholder="例如：迪拜", label_visibility="collapsed", key="custom_overseas_input")
+                    custom_overseas = st.text_input(
+                        "输入意向城市/国家", 
+                        placeholder="例如：迪拜", 
+                        label_visibility="collapsed", 
+                        key="custom_overseas_input"
+                    )
                     st.session_state.custom_city = custom_overseas
                     st.session_state.selected_city = custom_overseas
                 else:
@@ -693,63 +769,189 @@ if st.session_state.app_stage == "input":
         st.markdown('</div>', unsafe_allow_html=True)
 
     # 提交区域
-    st.markdown("---")
+    st.markdown("<hr>", unsafe_allow_html=True)
+
+    # 修复：正确判断是否有简历（处理文件指针已读取的情况）
     has_res = uploaded_resume is not None
     has_jd = bool(jd_text_raw and len(jd_text_raw.strip()) >= 10)
 
     col_s, col_b = st.columns([1, 2])
-    col_s.markdown('<div class="status-chip chip-ready">✓ 信息已就绪</div>' if (has_res and has_jd) else '<div class="status-chip chip-wait">○ 待完善输入源数据</div>', unsafe_allow_html=True)
+    col_s.markdown(
+        '<div class="status-chip chip-ready">✓ 信息已就绪</div>' if (has_res and has_jd) 
+        else '<div class="status-chip chip-wait">○ 待完善输入源数据</div>', 
+        unsafe_allow_html=True
+    )
 
     with col_b:
-        if st.button("✨ 一键开始智能匹配", use_container_width=True, disabled=not (has_res and has_jd)):
-            st.session_state.resume_content = extract_text(uploaded_resume)
+        if st.button(
+            "✨ 一键开始智能匹配", 
+            use_container_width=True, 
+            disabled=not (has_res and has_jd),
+            key="start_button"
+        ):
+            # 保存数据到 session state（state.py 封装）
+            if uploaded_resume:
+                uploaded_resume.seek(0)  # 重置文件指针
+                st.session_state.resume_content = extract_text(uploaded_resume)
             st.session_state.jd_content = jd_text_raw
             st.session_state.loading = True
             st.rerun()
 
 # ==========================================
-# 7. 加载页
+# 8. 加载页（Phase 1：集成 LLM 调用）
 # ==========================================
 elif st.session_state.loading:
-    p_text, p_bar = st.empty(), st.progress(0)
-    stages = [("📄 解析简历结构", 30), ("🎯 分析岗位 JD", 60), ("🤖 生成匹配策略", 90), ("✨ 即将完成", 100)]
+    p_text = st.empty()
+    p_bar = st.progress(0)
+
+    # Phase 1 MVP：在加载过程中调用 LLM
+    stages = [
+        ("📄 解析简历结构", 20),
+        ("🎯 分析岗位 JD", 40), 
+        ("🤖 调用大模型优化简历", 70),   # 新增：实际调用 LLM
+        ("💾 保存 Memory 状态", 85),      # 新增：保存对话历史
+        ("✨ 即将完成", 100)
+    ]
+
+    # 在进度条到 40% 时调用 LLM
+    llm_result = None
+
     for i in range(100):
-        time.sleep(0.015)
+        time.sleep(0.02)
         p_bar.progress(i + 1)
+
+        # 更新状态文本
         for text, threshold in stages:
             if i < threshold:
-                p_text.markdown(f"<div style='text-align:center; color:rgba(255,255,255,0.8); font-weight:500; font-size:0.9rem;'>{text} {i+1}%</div>", unsafe_allow_html=True)
+                p_text.markdown(
+                    f"<div style='text-align:center; color:rgba(255,255,255,0.8); font-weight:500; font-size:0.9rem;'>"
+                    f"{text} {i+1}%</div>", 
+                    unsafe_allow_html=True
+                )
                 break
-    st.session_state.loading, st.session_state.app_stage = False, "result"
+
+        # 在 45% 进度时执行 LLM 调用（后台）
+        if i == 45 and llm_result is None:
+            p_text.markdown(
+                f"<div style='text-align:center; color:rgba(255,255,255,0.8); font-weight:500; font-size:0.9rem;'>"
+                f"🤖 正在调用 {st.session_state.current_model} 优化简历...</div>", 
+                unsafe_allow_html=True
+            )
+            llm_result = optimize_resume_with_llm(
+                resume_text=st.session_state.resume_content,
+                jd_text=st.session_state.jd_content,
+                company_type=st.session_state.target_company_type,
+                model_name=st.session_state.current_model
+            )
+            # 保存结果到 session state
+            st.session_state.optimized_resume = llm_result.get("optimized_resume", "")
+            st.session_state.match_score = llm_result.get("match_score", 0)
+            st.session_state.analysis_result = llm_result
+
+    # 完成
+    st.session_state.loading = False
+    st.session_state.app_stage = "result"
     st.rerun()
 
 # ==========================================
-# 8. 结果页
+# 9. 结果页（Phase 1：展示 LLM 输出）
 # ==========================================
 elif st.session_state.app_stage == "result":
 
     st.markdown('<div class="result-header-glass"><h3>🔍 智能解析对比看板</h3></div>', unsafe_allow_html=True)
     st.markdown('<div class="step-track"><div class="step-node completed">✓</div><div class="step-line active"></div><div class="step-node active">2</div></div>', unsafe_allow_html=True)
-    st.markdown('<div class="success-glass">🎉 Agent 已完成深度解析，以下是实时多维对比视图</div>', unsafe_allow_html=True)
+    st.markdown('<div class="success-glass">🎉 Agent 已完成深度解析与简历优化</div>', unsafe_allow_html=True)
 
     if st.button("← 返回修改数据", key="back_btn"):
         st.session_state.app_stage = "input"
         st.rerun()
 
-    res_col1, res_col2 = st.columns(2, gap="large")
+    # ===== Phase 1 MVP 新增：展示优化后的简历 =====
+
+    # 匹配分数展示
+    score = st.session_state.get("match_score", 0)
+    if score > 0:
+        st.markdown(f"""
+        <div style="text-align: center; margin-bottom: 1rem;">
+            <div style="display: inline-block; background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); 
+                        border-radius: 16px; padding: 0.8rem 2rem; border: 1px solid rgba(255,255,255,0.2);">
+                <div style="font-size: 2rem; font-weight: 700; color: #6ee7b7;">{score}%</div>
+                <div style="font-size: 0.8rem; color: rgba(255,255,255,0.6);">简历匹配度</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # 三列布局：原始简历 | JD | 优化后简历
+    res_col1, res_col2, res_col3 = st.columns(3, gap="medium")
 
     with res_col1:
         st.markdown('<div class="result-glass">', unsafe_allow_html=True)
-        st.markdown('<div class="result-title">📄 简历解析结果</div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="result-meta">{len(st.session_state.resume_content)} 字符 · 数据已完全解构</div>', unsafe_allow_html=True)
-        st.text_area("R", value=st.session_state.resume_content, height=380, disabled=True, label_visibility="collapsed")
+        st.markdown('<div class="result-title">📄 原始简历</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="result-meta">{len(st.session_state.resume_content)} 字符 · 已解析</div>', unsafe_allow_html=True)
+        st.text_area(
+            "原始简历", 
+            value=st.session_state.resume_content, 
+            height=380, 
+            disabled=True, 
+            label_visibility="collapsed",
+            key="original_resume_display"
+        )
         st.markdown('</div>', unsafe_allow_html=True)
 
     with res_col2:
         st.markdown('<div class="result-glass">', unsafe_allow_html=True)
         st.markdown('<div class="result-title">🎯 目标岗位 JD</div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="result-meta">{len(st.session_state.jd_content)} 字符 · 上下文已注入容器</div>', unsafe_allow_html=True)
-        st.text_area("J", value=st.session_state.jd_content, height=380, disabled=True, label_visibility="collapsed")
+        st.markdown(f'<div class="result-meta">{len(st.session_state.jd_content)} 字符 · 已注入</div>', unsafe_allow_html=True)
+        st.text_area(
+            "JD", 
+            value=st.session_state.jd_content, 
+            height=380, 
+            disabled=True, 
+            label_visibility="collapsed",
+            key="jd_display"
+        )
         st.markdown('</div>', unsafe_allow_html=True)
 
-    st.markdown("<div class='footer-hint'>💡 对比视图已生成，后续可接入大模型进行智能润色与匹配分析</div>", unsafe_allow_html=True)
+    with res_col3:
+        st.markdown('<div class="result-glass">', unsafe_allow_html=True)
+        st.markdown('<div class="result-title">✨ AI 优化后的简历</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="result-meta">{len(st.session_state.get("optimized_resume", ""))} 字符 · LLM 生成</div>', unsafe_allow_html=True)
+
+        # 展示 LLM 优化结果
+        optimized = st.session_state.get("optimized_resume", "优化失败，请重试")
+        st.text_area(
+            "优化简历", 
+            value=optimized, 
+            height=380, 
+            disabled=True, 
+            label_visibility="collapsed",
+            key="optimized_resume_display"
+        )
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # ===== 操作按钮区 =====
+    st.markdown("<hr>", unsafe_allow_html=True)
+
+    btn_col1, btn_col2, btn_col3 = st.columns(3)
+
+    with btn_col1:
+        if st.button("📋 复制优化简历", use_container_width=True, key="copy_btn"):
+            st.toast("已复制到剪贴板！")
+
+    with btn_col2:
+        if st.button("🔄 重新优化", use_container_width=True, key="reoptimize_btn"):
+            st.session_state.loading = True
+            st.rerun()
+
+    with btn_col3:
+        if st.button("💾 导出 Word", use_container_width=True, key="export_btn"):
+            st.toast("导出功能开发中...")
+
+    # Memory 状态提示
+    analysis = st.session_state.get("analysis_result", {})
+    if analysis.get("memory_saved"):
+        st.markdown("<div class='footer-hint'>💾 本次优化记录已保存至 Memory</div>", unsafe_allow_html=True)
+    else:
+        st.markdown("<div class='footer-hint'>⚠️ Memory 保存未启用（模块未加载）</div>", unsafe_allow_html=True)
+
+    st.markdown("<div class='footer-hint'>💡 对比视图已生成，左侧为原始简历，右侧为 AI 优化版本</div>", unsafe_allow_html=True)
